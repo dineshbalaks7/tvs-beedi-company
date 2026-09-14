@@ -50,18 +50,28 @@ async function verifyPassword(password, hash, salt) {
   return crypto.timingSafeEqual(Buffer.from(result.hash, 'hex'), Buffer.from(hash, 'hex'));
 }
 
+// Enable proxy trust for reverse proxies like Vercel (required for secure cookies)
+app.set('trust proxy', 1);
+
 // Middleware
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Session Store with error handling
+const sessionStore = MongoStore.create({
+  mongoUrl: MONGODB_URI,
+  ttl: 8 * 60 * 60
+});
+sessionStore.on('error', (err) => {
+  console.error('Session store error:', err.message || err);
+});
+
 app.use(session({
   secret: SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
-  store: MongoStore.create({
-    mongoUrl: MONGODB_URI,
-    ttl: 8 * 60 * 60
-  }),
+  store: sessionStore,
   cookie: {
     httpOnly: true,
     sameSite: 'lax',
@@ -142,19 +152,24 @@ app.post('/api/auth/change-password', requireAuth, async (req, res) => {
 });
 
 app.use((req, res, next) => {
-  const isPublicHtml = req.path === '/login.html';
-  if (req.path.endsWith('.html') && !isPublicHtml && (!req.session || !req.session.authenticated)) {
+  const isPublicHtml = req.path === '/login.html' || req.path === '/login';
+  if ((req.path === '/' || req.path.endsWith('.html')) && !isPublicHtml && (!req.session || !req.session.authenticated)) {
     return res.redirect('/login.html');
   }
   return next();
 });
 
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'public'), { index: false }));
 
-let databaseInitializationPromise;
-function ensureDatabaseInitialized() {
-  if (mongoose.connection.readyState === 1) return Promise.resolve();
-  if (!databaseInitializationPromise) databaseInitializationPromise = initializeDatabase();
+let databaseInitializationPromise = null;
+async function ensureDatabaseInitialized() {
+  if (mongoose.connection.readyState === 1) return;
+  if (!databaseInitializationPromise) {
+    databaseInitializationPromise = initializeDatabase().catch((err) => {
+      databaseInitializationPromise = null;
+      throw err;
+    });
+  }
   return databaseInitializationPromise;
 }
 
@@ -163,6 +178,13 @@ app.use(async (req, res, next) => {
     await ensureDatabaseInitialized();
     next();
   } catch (error) {
+    console.error('❌ Database connection error:', error.message);
+    if (req.originalUrl.startsWith('/api/')) {
+      return res.status(503).json({
+        error: 'Database connection unavailable. Please verify MONGODB_URI in Vercel settings and MongoDB Atlas network access.',
+        details: error.message
+      });
+    }
     next(error);
   }
 });
@@ -299,6 +321,7 @@ async function initializeDatabase() {
     }
   } catch (err) {
     console.error('❌ MongoDB initialization error:', err.message);
+    throw err;
   }
 }
 
