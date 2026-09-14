@@ -6,6 +6,7 @@
 require('dotenv').config();
 const express = require('express');
 const session = require('express-session');
+const MongoStore = require('connect-mongo');
 const crypto = require('crypto');
 const mongoose = require('mongoose');
 const cors = require('cors');
@@ -57,6 +58,10 @@ app.use(session({
   secret: SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
+  store: MongoStore.create({
+    mongoUrl: MONGODB_URI,
+    ttl: 8 * 60 * 60
+  }),
   cookie: {
     httpOnly: true,
     sameSite: 'lax',
