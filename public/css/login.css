@@ -65,9 +65,74 @@ body {
 .login-card label { display: block; margin: 14px 0 6px; font-size: 13px; font-weight: 700; }
 .login-card input { width: 100%; min-height: 46px; padding: 11px 13px; border: 1px solid #cbd5e1; border-radius: 9px; outline: none; font-size: 15px; }
 .login-card input:focus { border-color: var(--amber); box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.14); }
-.login-card button { width: 100%; min-height: 48px; margin-top: 20px; border: 0; border-radius: 9px; background: linear-gradient(135deg, var(--amber), #f59e0b); color: #fff; font-size: 15px; font-weight: 800; cursor: pointer; }
-.login-card button:hover { background: linear-gradient(135deg, var(--amber-dark), var(--amber)); }
-.login-card button:disabled { cursor: wait; opacity: 0.7; }
+.login-card button[type="submit"],
+.login-submit-btn {
+  width: 100%;
+  min-height: 48px;
+  margin-top: 20px;
+  border: 0;
+  border-radius: 9px;
+  background: linear-gradient(135deg, var(--amber), #f59e0b);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+.login-card button[type="submit"]:hover,
+.login-submit-btn:hover { background: linear-gradient(135deg, var(--amber-dark), var(--amber)); }
+.login-card button[type="submit"]:active,
+.login-submit-btn:active { transform: translateY(1px); }
+.login-card button[type="submit"]:disabled,
+.login-submit-btn:disabled { cursor: wait; opacity: 0.7; }
+
+.password-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.password-input-wrap input {
+  width: 100%;
+  padding-right: 46px;
+}
+
+.password-toggle-btn {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  min-height: 36px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  background: transparent !important;
+  border: none !important;
+  border-radius: 7px !important;
+  color: #64748b !important;
+  cursor: pointer;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.password-toggle-btn:hover {
+  color: var(--ink) !important;
+  background: rgba(0, 0, 0, 0.06) !important;
+}
+
+.password-toggle-btn:focus-visible {
+  outline: 2px solid var(--amber) !important;
+  outline-offset: 1px;
+}
+
+.password-toggle-btn svg {
+  pointer-events: none;
+}
+
 .login-error { margin: 14px 0 0; padding: 10px 12px; border: 1px solid #fecdca; border-radius: 8px; background: #fff1f0; color: var(--error); font-size: 13px; }
 
 @media (max-width: 480px) {
@@ -86,5 +151,7 @@ body {
   .login-heading p:last-child { font-size: 13px; }
   .login-card label { margin-top: 11px; font-size: 12px; }
   .login-card input { min-height: 42px; padding: 9px 11px; font-size: 14px; }
-  .login-card button { min-height: 44px; margin-top: 16px; }
+  .login-card button[type="submit"],
+  .login-submit-btn { min-height: 44px; margin-top: 16px; }
+  .password-toggle-btn { width: 34px; height: 34px; min-height: 34px !important; right: 4px; }
 }

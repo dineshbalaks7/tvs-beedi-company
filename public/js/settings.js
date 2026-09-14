@@ -103,6 +103,24 @@ async function handleChangePassword(event) {
   }
 }
 
+function togglePasswordVisibility(inputId, btn) {
+  const input = document.getElementById(inputId);
+  if (!input || !btn) return;
+  const isPassword = input.type === 'password';
+  input.type = isPassword ? 'text' : 'password';
+  btn.setAttribute('aria-pressed', isPassword ? 'true' : 'false');
+  btn.setAttribute('aria-label', isPassword ? 'Hide password' : 'Show password');
+  btn.setAttribute('title', isPassword ? 'Hide password' : 'Show password');
+
+  const eyeIcon = btn.querySelector('.eye-icon');
+  const eyeOffIcon = btn.querySelector('.eye-off-icon');
+  if (eyeIcon && eyeOffIcon) {
+    eyeIcon.style.display = isPassword ? 'none' : 'block';
+    eyeOffIcon.style.display = isPassword ? 'block' : 'none';
+  }
+  input.focus();
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   loadSettingsData();
 });

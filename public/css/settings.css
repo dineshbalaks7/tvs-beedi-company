@@ -25,3 +25,50 @@
   color: var(--text-dim);
   margin-top: 4px;
 }
+
+.password-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.password-input-wrap input {
+  width: 100%;
+  padding-right: 44px !important;
+}
+
+.password-toggle-btn {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  min-height: 32px;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: #64748b;
+  cursor: pointer;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.password-toggle-btn:hover {
+  color: var(--text-main, #1e293b);
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.password-toggle-btn:focus-visible {
+  outline: 2px solid var(--accent-amber, #d97706);
+  outline-offset: 1px;
+}
+
+.password-toggle-btn svg {
+  pointer-events: none;
+}
