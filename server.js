@@ -80,6 +80,38 @@ app.use(session({
   }
 }));
 
+let databaseInitializationPromise = null;
+async function ensureDatabaseInitialized() {
+  if (mongoose.connection.readyState === 1) return;
+  if (!databaseInitializationPromise) {
+    databaseInitializationPromise = initializeDatabase().catch((err) => {
+      databaseInitializationPromise = null;
+      throw err;
+    });
+  }
+  return databaseInitializationPromise;
+}
+
+// Ensure database connection is established before processing API / auth requests
+app.use(async (req, res, next) => {
+  if (req.path.startsWith('/css/') || req.path.startsWith('/js/') || req.path.startsWith('/images/') || req.path === '/favicon.ico') {
+    return next();
+  }
+  try {
+    await ensureDatabaseInitialized();
+    next();
+  } catch (error) {
+    console.error('❌ Database connection error:', error.message);
+    if (req.originalUrl.startsWith('/api/')) {
+      return res.status(503).json({
+        error: 'Database connection unavailable. Please verify MONGODB_URI in Vercel settings and MongoDB Atlas network access.',
+        details: error.message
+      });
+    }
+    next(error);
+  }
+});
+
 function requireAuth(req, res, next) {
   if (req.session && req.session.authenticated) return next();
   if (req.originalUrl.startsWith('/api/')) {
@@ -112,14 +144,25 @@ app.post('/api/auth/login', async (req, res) => {
     }
     req.session.authenticated = true;
     req.session.username = username;
-    return res.json({ authenticated: true });
+    req.session.save((saveErr) => {
+      if (saveErr) {
+        console.error('Session save error:', saveErr);
+        return res.status(500).json({ error: 'Unable to persist session', details: saveErr.message });
+      }
+      return res.json({ authenticated: true });
+    });
   } catch (error) {
-    return res.status(500).json({ error: 'Unable to sign in' });
+    console.error('Login error:', error);
+    return res.status(500).json({ error: 'Unable to sign in', details: error.message });
   }
 });
 
 app.post('/api/auth/logout', (req, res) => {
-  req.session.destroy(() => res.json({ authenticated: false }));
+  req.session.destroy((err) => {
+    if (err) console.error('Logout error:', err);
+    res.clearCookie('connect.sid');
+    res.json({ authenticated: false });
+  });
 });
 
 app.post('/api/auth/change-password', requireAuth, async (req, res) => {
@@ -147,7 +190,7 @@ app.post('/api/auth/change-password', requireAuth, async (req, res) => {
     await settings.save();
     return res.json({ updated: true });
   } catch (error) {
-    return res.status(500).json({ error: 'Unable to change password' });
+    return res.status(500).json({ error: 'Unable to change password', details: error.message });
   }
 });
 
@@ -160,34 +203,6 @@ app.use((req, res, next) => {
 });
 
 app.use(express.static(path.join(__dirname, 'public'), { index: false }));
-
-let databaseInitializationPromise = null;
-async function ensureDatabaseInitialized() {
-  if (mongoose.connection.readyState === 1) return;
-  if (!databaseInitializationPromise) {
-    databaseInitializationPromise = initializeDatabase().catch((err) => {
-      databaseInitializationPromise = null;
-      throw err;
-    });
-  }
-  return databaseInitializationPromise;
-}
-
-app.use(async (req, res, next) => {
-  try {
-    await ensureDatabaseInitialized();
-    next();
-  } catch (error) {
-    console.error('❌ Database connection error:', error.message);
-    if (req.originalUrl.startsWith('/api/')) {
-      return res.status(503).json({
-        error: 'Database connection unavailable. Please verify MONGODB_URI in Vercel settings and MongoDB Atlas network access.',
-        details: error.message
-      });
-    }
-    next(error);
-  }
-});
 
 // API Routes
 app.use('/api', requireAuth, apiRoutes);

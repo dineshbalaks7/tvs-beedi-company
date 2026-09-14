@@ -50,7 +50,10 @@
             password: form.password.value
           })
         });
-        if (!response.ok) throw new Error('Invalid username or password');
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({}));
+          throw new Error(data.details ? `${data.error} (${data.details})` : (data.error || 'Invalid username or password'));
+        }
         window.location.href = '/dashboard';
       } catch (err) {
         error.textContent = err.message;
