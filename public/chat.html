@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="ta">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>TVS பீடி கம்பெனி - AI உதவியாளர் | AI Assistant</title>
+  <meta name="description" content="TVS Beedi Company - Tamil conversational AI assistant for production, stock, and expenses.">
+  <link rel="icon" type="image/png" href="/images/logo.png">
+  <link rel="apple-touch-icon" href="/images/logo.png">
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Mukta+Malar:wght@400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Stylesheets -->
+  <link rel="stylesheet" href="/css/common.css">
+  <link rel="stylesheet" href="/css/chat.css">
+</head>
+<body>
+  <div class="app-container">
+    
+    <!-- Top App Header -->
+    <header class="app-header">
+      <div class="brand-wrapper">
+        <div class="brand-logo-wrap">
+          <img src="/images/logo.png" alt="TVS Beedi Logo" class="brand-logo-img">
+        </div>
+        <div class="brand-text">
+          <h1 data-i18n="companyName">TVS பீடி கம்பெனி</h1>
+          <p><span class="status-dot"></span> <span data-i18n="companyTagline">உள் நிர்வாக தளம்</span></p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button id="themeToggleBtn" class="lang-btn" onclick="toggleTheme()" title="Theme">🌙 இரவு</button>
+        <div id="langSwitcher" class="lang-switcher-pill" onclick="toggleLanguage()" role="button" aria-label="Switch Language" title="Switch Language / மொழியை மாற்ற">
+          <span id="langChipTa" class="lang-segment active">தமிழ்</span>
+          <span id="langChipEn" class="lang-segment">EN</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Toast Container -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <!-- Main Content: AI Chat Assistant -->
+    <main class="main-content">
+      <section id="view-chat" class="tab-view active">
+        <div class="section-title-wrap">
+          <h2 class="section-title">💬 <span data-i18n="chatTitle">AI தமிழ் நிர்வாக உதவியாளர்</span></h2>
+          <p class="section-subtitle" data-i18n="chatSub">உற்பத்தி, இருப்பு, கணக்கீடுகளைத் தமிழில் கேட்டு தெரிந்துகொள்ளலாம் அல்லது குரல் வழி பதிவு செய்யலாம்</p>
+        </div>
+
+        <div class="chat-container">
+          <!-- Scrollable messages container -->
+          <div class="chat-messages" id="chatMessages">
+            <div class="chat-bubble assistant">
+              வணக்கம்! 🙏 நான் TVS பீடி கம்பெனியின் AI உதவியாளர். இன்றைய உற்பத்தி, Tobacco இருப்பு, தூள் பயன்பாடு, செலவுகள் பற்றி தமிழில் கேட்கலாம் அல்லது புதிய பதிவுகளைச் சேர்க்கலாம்.
+            </div>
+          </div>
+
+          <!-- Quick Suggestion Chips -->
+          <div class="chat-quick-chips" id="quickChips">
+            <button class="chip-btn" onclick="sendQuickPrompt('இன்னைக்கு எத்தனை பீடி உற்பத்தி பண்ணிருக்கோம்?')">இன்று உற்பத்தி?</button>
+            <button class="chip-btn" onclick="sendQuickPrompt('இப்போ எவ்வளவு tobacco stock இருக்கு?')">Tobacco Stock?</button>
+            <button class="chip-btn" onclick="sendQuickPrompt('இப்போ எவ்வளவு தூள் stock இருக்கு?')">தூள் Stock?</button>
+            <button class="chip-btn" onclick="sendQuickPrompt('இன்று எவ்வளவு tobacco மற்றும் தூள் பயன்பாடு?')">பயன்பாடு அறிக்கை?</button>
+            <button class="chip-btn" onclick="sendQuickPrompt('100 cut போட்டா எவ்வளவு tobacco தேவை?')">100 Cut தேவைகள்?</button>
+            <button class="chip-btn" onclick="sendQuickPrompt('இந்த மாதம் எவ்வளவு profit?')">மாத லாபம்?</button>
+            <button class="chip-btn" onclick="sendQuickPrompt('இன்று 100 கட்டு production add பண்ணு')">+100 Cut பதிவு செய்</button>
+            <button class="chip-btn" onclick="sendQuickPrompt('இன்று ₹500 கரண்ட் பில் expense add பண்ணு')">+₹500 செலவு சேர்</button>
+          </div>
+
+          <!-- Input Bar with Mic & Send -->
+          <div class="chat-input-bar">
+            <input type="text" id="chatInputField" class="chat-input-field" placeholder="தமிழில் கேட்கவும் அல்லது உள்ளிடவும்..." data-i18n-placeholder="chatInputPlaceholder" onkeypress="handleChatKeyPress(event)">
+            <button type="button" id="chatMicBtn" class="chat-icon-btn chat-mic-btn" onclick="toggleVoiceInput()" title="Voice Input / தமிழில் பேச">
+              🎤
+            </button>
+            <button type="button" class="chat-icon-btn chat-send-btn" onclick="handleSendChat()" title="Send">
+              ➤
+            </button>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Bottom Navigation Bar for Mobile Viewports -->
+    <nav class="bottom-nav">
+      <a href="/dashboard" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        <span data-i18n="navDashboard">முகப்பு</span>
+      </a>
+      <a href="/production" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M2 20h20M7 20V10l5 3V4l7 5v11"/></svg>
+        <span data-i18n="navProduction">உற்பத்தி</span>
+      </a>
+      <a href="/stock" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+        <span data-i18n="navStock">இருப்பு</span>
+      </a>
+      <a href="/expenses" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        <span data-i18n="navExpenses">செலவுகள்</span>
+      </a>
+      <a href="/export" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>
+        <span data-i18n="navExport">ஏற்றுமதி</span>
+      </a>
+      <a href="/chat" class="nav-item chat-tab active">
+        <span class="chat-pulse-badge"></span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        <span data-i18n="navChat">AI சாட்</span>
+      </a>
+      <a href="/settings" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        <span data-i18n="navSettings">அமைப்புகள்</span>
+      </a>
+    </nav>
+
+  </div>
+
+  <!-- Scripts -->
+  <script src="/js/i18n.js"></script>
+  <script src="/js/common.js"></script>
+  <script src="/js/chat.js"></script>
+</body>
+</html>

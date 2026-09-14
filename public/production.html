@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="ta">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>TVS பீடி கம்பெனி - உற்பத்தி | Production</title>
+  <meta name="description" content="TVS Beedi Company - Daily production entry, box & cut calculations, duplicate date protection.">
+  <link rel="icon" type="image/png" href="/images/logo.png">
+  <link rel="apple-touch-icon" href="/images/logo.png">
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Mukta+Malar:wght@400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Stylesheets -->
+  <link rel="stylesheet" href="/css/common.css">
+  <link rel="stylesheet" href="/css/production.css">
+</head>
+<body>
+  <div class="app-container">
+    
+    <!-- Top App Header -->
+    <header class="app-header">
+      <div class="brand-wrapper">
+        <div class="brand-logo-wrap">
+          <img src="/images/logo.png" alt="TVS Beedi Logo" class="brand-logo-img">
+        </div>
+        <div class="brand-text">
+          <h1 data-i18n="companyName">TVS பீடி கம்பெனி</h1>
+          <p><span class="status-dot"></span> <span data-i18n="companyTagline">உள் நிர்வாக தளம்</span></p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button id="themeToggleBtn" class="lang-btn" onclick="toggleTheme()" title="Theme">🌙 இரவு</button>
+        <div id="langSwitcher" class="lang-switcher-pill" onclick="toggleLanguage()" role="button" aria-label="Switch Language" title="Switch Language / மொழியை மாற்ற">
+          <span id="langChipTa" class="lang-segment active">தமிழ்</span>
+          <span id="langChipEn" class="lang-segment">EN</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Toast Container -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <!-- Main Content: Production -->
+    <main class="main-content">
+      <section id="view-production" class="tab-view active">
+        <div class="section-title-wrap">
+          <h2 class="section-title">🏭 <span data-i18n="prodTitle">உற்பத்தி பதிவு</span></h2>
+          <p class="section-subtitle" data-i18n="prodSub">கட்டை (Box) எண்ணிக்கை உள்ளிட்டவுடன் தானியங்கி கணக்கீடு செய்யப்படும்</p>
+        </div>
+
+        <!-- Production Entry Form -->
+        <div class="card">
+          <form id="productionForm" onsubmit="handleProductionSubmit(event)">
+            <!-- Hidden input for edit mode -->
+            <input type="hidden" id="prodEditId" value="">
+
+            <!-- Duplicate / Existing Record Warning Alert Banner -->
+            <div id="prodDuplicateAlert" class="duplicate-alert-banner" style="display: none;">
+              <div class="duplicate-alert-content">
+                <div class="duplicate-alert-info">
+                  <span class="duplicate-alert-icon">⚠️</span>
+                  <div>
+                    <div class="duplicate-alert-title" id="prodAlertTitle" data-i18n="duplicateDateWarning">
+                      ⚠️ இந்த தேதியில் ஏற்கனவே உற்பத்தி பதிவு உள்ளது!
+                    </div>
+                    <div class="duplicate-alert-desc" id="prodAlertDesc">
+                      ஒரே தேதியில் நகல் (Duplicate) பதிவு அனுமதிக்கப்படாது. ஏற்கனவே உள்ள பதிவைத் திருத்த விரும்புகிறீர்களா?
+                    </div>
+                  </div>
+                </div>
+                <div class="duplicate-alert-actions">
+                  <button type="button" id="btnAlertEditExisting" class="btn-primary" style="min-height: 32px; padding: 4px 12px; font-size: 12.5px;" onclick="loadExistingRecordForEdit()">
+                    <span>✏️</span> <span data-i18n="editExistingBtn">இந்த பதிவைத் திருத்து (Edit)</span>
+                  </button>
+                  <button type="button" id="btnAlertDismiss" class="btn-secondary" style="min-height: 32px; padding: 4px 10px; font-size: 12px;" onclick="dismissDuplicateAlert()">
+                    ✕
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Edit Mode Status Badge -->
+            <div id="prodEditModeBadge" class="edit-mode-indicator" style="display: none;">
+              <span id="prodEditModeText" class="edit-mode-indicator-text">✏️ பதிவு திருத்தும் நிலையில் உள்ளது</span>
+              <button type="button" class="btn-secondary" style="min-height: 28px; padding: 2px 10px; font-size: 12px;" onclick="cancelEditProduction()">
+                ✕ <span data-i18n="cancelBtn">ரத்து செய்</span>
+              </button>
+            </div>
+
+            <div class="form-grid">
+              <div class="form-group">
+                <label class="form-label" for="prodDate" data-i18n="prodDateLabel">தேதி (Date)</label>
+                <input type="date" id="prodDate" class="form-input" required onchange="handleProdDateChange(this.value)">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="prodBoxes" data-i18n="prodBoxesLabel">கட்டை எண்ணிக்கை (Boxes)</label>
+                <input type="number" id="prodBoxes" class="form-input" placeholder="எ.கா: 10" data-i18n-placeholder="boxesPlaceholder" min="0.1" step="0.1" required oninput="handleBoxesInput(this.value)">
+              </div>
+            </div>
+
+            <!-- Live Calculation Preview Card -->
+            <div class="calc-preview-card">
+              <div class="calc-preview-title">
+                <span>⚡</span> <span data-i18n="calcPreviewTitle">உடனடி நேரடி கணக்கீடு (Live Preview)</span>
+              </div>
+              <div class="calc-chips-grid">
+                <div class="calc-chip">
+                  <span class="calc-chip-label" data-i18n="calcBoxes">கட்டை (Boxes)</span>
+                  <span class="calc-chip-val" id="prevBoxes">0</span>
+                </div>
+                <div class="calc-chip">
+                  <span class="calc-chip-label" data-i18n="calcCuts">கட்டுகள் (Cuts)</span>
+                  <span class="calc-chip-val" id="prevCuts">0</span>
+                </div>
+                <div class="calc-chip">
+                  <span class="calc-chip-label" data-i18n="calcBeedis">பீடிகள் (Beedis)</span>
+                  <span class="calc-chip-val" id="prevBeedis">0</span>
+                </div>
+                <div class="calc-chip">
+                  <span class="calc-chip-label" data-i18n="calcTobacco">Tobacco பயன்பாடு</span>
+                  <span class="calc-chip-val" id="prevTobacco">0 g</span>
+                </div>
+                <div class="calc-chip">
+                  <span class="calc-chip-label" data-i18n="calcPowder">தூள் பயன்பாடு</span>
+                  <span class="calc-chip-val" id="prevPowder">0 g</span>
+                </div>
+                <div class="calc-chip highlight">
+                  <span class="calc-chip-label" data-i18n="calcSalary">கூலி மதிப்பு (₹1,920/Bx)</span>
+                  <span class="calc-chip-val" id="prevSalary">₹0</span>
+                </div>
+                <div class="calc-chip highlight-rate">
+                  <span class="calc-chip-label" data-i18n="calcRate">Rate மதிப்பு (₹2,040/Bx)</span>
+                  <span class="calc-chip-val" id="prevRate">₹0</span>
+                </div>
+                <div class="calc-chip highlight-profit">
+                  <span class="calc-chip-label" data-i18n="calcProfit">லாபம் (Rate − கூலி) (₹120/Bx)</span>
+                  <span class="calc-chip-val" id="prevProfit">₹0</span>
+                </div>
+              </div>
+            </div>
+
+            <div style="display: flex; gap: 10px; margin-top: 6px;">
+              <button type="submit" class="btn-primary" style="flex: 1;">
+                <span id="prodSubmitIcon">💾</span> <span id="prodSubmitText" data-i18n="saveProductionBtn">உற்பத்தியைச் சேமிக்கவும்</span>
+              </button>
+              <button type="button" id="btnCancelEditProd" class="btn-secondary" style="display: none;" onclick="cancelEditProduction()" data-i18n="cancelBtn">
+                ரத்து
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Production Tracking Bar Chart Card -->
+        <div class="card">
+          <div class="card-title-row">
+            <div>
+              <h3 class="card-title">📊 <span data-i18n="chartProdTrackingTitle">உற்பத்தி கண்காணிப்பு</span></h3>
+              <p class="section-subtitle" style="margin: 4px 0 0;" data-i18n="chartProdTrackingSub">முந்தைய உற்பத்தி போக்கு & பகுப்பாய்வு</p>
+            </div>
+            <div class="chart-filter-group" id="prodChartFilterGroup">
+              <button type="button" class="chart-filter-btn active" id="prodFilterDay" onclick="switchProductionChartFilter('day')">📅 <span data-i18n="chartDayFilter">நாள்</span></button>
+              <button type="button" class="chart-filter-btn" id="prodFilterWeek" onclick="switchProductionChartFilter('week')">📆 <span data-i18n="chartWeekFilter">வாரம்</span></button>
+              <button type="button" class="chart-filter-btn" id="prodFilterMonth" onclick="switchProductionChartFilter('month')">🗓️ <span data-i18n="chartMonthFilter">மாதம்</span></button>
+            </div>
+          </div>
+          <div class="chart-canvas-wrapper" style="height: 290px;">
+            <canvas id="productionBarChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Production Records Table Card -->
+        <div class="card">
+          <div class="card-title-row">
+            <h3 class="card-title">📜 <span data-i18n="prodHistoryTitle">உற்பத்தி பதிவுகள் வரலாறு</span></h3>
+          </div>
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th data-i18n="colDate">தேதி</th>
+                  <th data-i18n="colBoxes">கட்டை (Boxes)</th>
+                  <th data-i18n="colCuts">கட்டுகள்</th>
+                  <th data-i18n="colBeedis">பீடிகள்</th>
+                  <th data-i18n="colTobacco">Tobacco</th>
+                  <th data-i18n="colPowder">தூள்</th>
+                  <th data-i18n="colSalary">சம்பளம்</th>
+                  <th data-i18n="colRate">Rate</th>
+                  <th data-i18n="colProfit">லாபம்</th>
+                  <th data-i18n="colActions">செயல்கள்</th>
+                </tr>
+              </thead>
+              <tbody id="productionTableBody">
+                <tr><td colspan="10" style="text-align:center;" data-i18n="loading">ஏற்றப்படுகிறது...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Bottom Navigation Bar for Mobile Viewports -->
+    <nav class="bottom-nav">
+      <a href="/dashboard" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        <span data-i18n="navDashboard">முகப்பு</span>
+      </a>
+      <a href="/production" class="nav-item active">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M2 20h20M7 20V10l5 3V4l7 5v11"/></svg>
+        <span data-i18n="navProduction">உற்பத்தி</span>
+      </a>
+      <a href="/stock" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+        <span data-i18n="navStock">இருப்பு</span>
+      </a>
+      <a href="/expenses" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        <span data-i18n="navExpenses">செலவுகள்</span>
+      </a>
+      <a href="/export" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>
+        <span data-i18n="navExport">ஏற்றுமதி</span>
+      </a>
+      <a href="/chat" class="nav-item chat-tab">
+        <span class="chat-pulse-badge"></span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        <span data-i18n="navChat">AI சாட்</span>
+      </a>
+      <a href="/settings" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        <span data-i18n="navSettings">அமைப்புகள்</span>
+      </a>
+    </nav>
+
+  </div>
+
+  <!-- Scripts -->
+  <script src="/js/chart.umd.min.js"></script>
+  <script src="/js/i18n.js"></script>
+  <script src="/js/common.js"></script>
+  <script src="/js/production.js"></script>
+</body>
+</html>

@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="ta">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>TVS பீடி கம்பெனி - சரக்கு இருப்பு | Stock</title>
+  <meta name="description" content="TVS Beedi Company - Raw material stock tracking, tobacco & powder consumption reporting, ledger.">
+  <link rel="icon" type="image/png" href="/images/logo.png">
+  <link rel="apple-touch-icon" href="/images/logo.png">
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Mukta+Malar:wght@400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Stylesheets -->
+  <link rel="stylesheet" href="/css/common.css">
+  <link rel="stylesheet" href="/css/stock.css">
+</head>
+<body>
+  <div class="app-container">
+    
+    <!-- Top App Header -->
+    <header class="app-header">
+      <div class="brand-wrapper">
+        <div class="brand-logo-wrap">
+          <img src="/images/logo.png" alt="TVS Beedi Logo" class="brand-logo-img">
+        </div>
+        <div class="brand-text">
+          <h1 data-i18n="companyName">TVS பீடி கம்பெனி</h1>
+          <p><span class="status-dot"></span> <span data-i18n="companyTagline">உள் நிர்வாக தளம்</span></p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button id="themeToggleBtn" class="lang-btn" onclick="toggleTheme()" title="Theme">🌙 இரவு</button>
+        <div id="langSwitcher" class="lang-switcher-pill" onclick="toggleLanguage()" role="button" aria-label="Switch Language" title="Switch Language / மொழியை மாற்ற">
+          <span id="langChipTa" class="lang-segment active">தமிழ்</span>
+          <span id="langChipEn" class="lang-segment">EN</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Toast Container -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <!-- Main Content: Stock -->
+    <main class="main-content">
+      <section id="view-stock" class="tab-view active">
+        <div class="section-title-wrap">
+          <h2 class="section-title">📦 <span data-i18n="stockTitle">சரக்கு இருப்பு & பயன்பாடு</span></h2>
+          <p class="section-subtitle" data-i18n="stockSub">புகையிலை & தூள் இருப்பு நிலவரம் மற்றும் நேரடி நுகர்வு அறிக்கை</p>
+        </div>
+
+        <!-- Stock Cards Grid -->
+        <div class="metrics-grid">
+          <div class="metric-card">
+            <div class="card-title-row">
+              <span class="metric-label" data-i18n="tobaccoStock">Tobacco கையிருப்பு</span>
+              <div class="stock-action-buttons">
+                <button class="btn-secondary" style="min-height: 28px; padding: 2px 8px; font-size: 11px;" onclick="openStockModal('tobacco', 'add')">+ வரவு</button>
+                <button class="btn-secondary" style="min-height: 28px; padding: 2px 8px; font-size: 11px;" onclick="openStockModal('tobacco', 'adjust')">சரிசெய்</button>
+              </div>
+            </div>
+            <div class="metric-value" id="stockTobaccoKg">0.0 <span class="metric-unit">kg</span></div>
+            <div class="metric-sub" id="stockTobaccoGrams">0 கிராம்</div>
+            <div class="metric-sub" id="stockTobaccoConsumedSub" style="margin-top: 4px; color: var(--accent-amber); font-weight: 600;">இன்று உற்பத்தி பயன்பாடு: 0.0 kg</div>
+          </div>
+
+          <div class="metric-card">
+            <div class="card-title-row">
+              <span class="metric-label" data-i18n="powderStock">தூள் கையிருப்பு</span>
+              <div class="stock-action-buttons">
+                <button class="btn-secondary" style="min-height: 28px; padding: 2px 8px; font-size: 11px;" onclick="openStockModal('powder', 'add')">+ வரவு</button>
+                <button class="btn-secondary" style="min-height: 28px; padding: 2px 8px; font-size: 11px;" onclick="openStockModal('powder', 'adjust')">சரிசெய்</button>
+              </div>
+            </div>
+            <div class="metric-value" id="stockPowderKg">0.0 <span class="metric-unit">kg</span></div>
+            <div class="metric-sub" id="stockPowderGrams">0 கிராம்</div>
+            <div class="metric-sub" id="stockPowderConsumedSub" style="margin-top: 4px; color: var(--accent-amber); font-weight: 600;">இன்று உற்பத்தி பயன்பாடு: 0.0 kg</div>
+          </div>
+        </div>
+
+        <!-- Material Consumption Reporting Breakdown Card -->
+        <div class="card">
+          <div class="card-title-row">
+            <div>
+              <h3 class="card-title">🍃 <span data-i18n="consumptionReportingTitle">பொருட்கள் பயன்பாடு அறிக்கை (Consumption Matrix)</span></h3>
+              <p class="section-subtitle" style="margin-top: 4px; margin-bottom: 0;" data-i18n="consumptionReportingSub">
+                உற்பத்திக்கு நுகரப்பட்ட மூலப்பொருட்களின் விரிவான அறிக்கை
+              </p>
+            </div>
+          </div>
+
+          <div class="consumption-report-grid">
+            <div class="consumption-card">
+              <div class="consumption-card-title">📅 <span data-i18n="reportToday">இன்று (Today)</span></div>
+              <div class="consumption-card-metric">
+                <span class="consumption-metric-label">Tobacco:</span>
+                <span class="consumption-metric-val" id="stockRepTodayTobacco">0 kg</span>
+              </div>
+              <div class="consumption-card-metric">
+                <span class="consumption-metric-label" data-i18n="labelPowder">தூள்:</span>
+                <span class="consumption-metric-val" id="stockRepTodayPowder">0 kg</span>
+              </div>
+              <div class="consumption-card-metric">
+                <span class="consumption-metric-label" data-i18n="labelProduction">உற்பத்தி:</span>
+                <span class="consumption-metric-val" id="stockRepTodayCuts">0 Cuts</span>
+              </div>
+            </div>
+
+            <div class="consumption-card">
+              <div class="consumption-card-title">📆 <span data-i18n="reportWeek">இந்த வாரம் (This Week)</span></div>
+              <div class="consumption-card-metric">
+                <span class="consumption-metric-label">Tobacco:</span>
+                <span class="consumption-metric-val" id="stockRepWeekTobacco">0 kg</span>
+              </div>
+              <div class="consumption-card-metric">
+                <span class="consumption-metric-label" data-i18n="labelPowder">தூள்:</span>
+                <span class="consumption-metric-val" id="stockRepWeekPowder">0 kg</span>
+              </div>
+              <div class="consumption-card-metric">
+                <span class="consumption-metric-label" data-i18n="labelProduction">உற்பத்தி:</span>
+                <span class="consumption-metric-val" id="stockRepWeekCuts">0 Cuts</span>
+              </div>
+            </div>
+
+            <div class="consumption-card">
+              <div class="consumption-card-title">📊 <span data-i18n="reportMonth">இந்த மாதம் (This Month)</span></div>
+              <div class="consumption-card-metric">
+                <span class="consumption-metric-label">Tobacco:</span>
+                <span class="consumption-metric-val" id="stockRepMonthTobacco">0 kg</span>
+              </div>
+              <div class="consumption-card-metric">
+                <span class="consumption-metric-label" data-i18n="labelPowder">தூள்:</span>
+                <span class="consumption-metric-val" id="stockRepMonthPowder">0 kg</span>
+              </div>
+              <div class="consumption-card-metric">
+                <span class="consumption-metric-label" data-i18n="labelProduction">உற்பத்தி:</span>
+                <span class="consumption-metric-val" id="stockRepMonthCuts">0 Cuts</span>
+              </div>
+            </div>
+
+            <div class="consumption-card">
+              <div class="consumption-card-title">📈 <span data-i18n="reportTotal">மொத்த பயன்பாடு (All Time)</span></div>
+              <div class="consumption-card-metric">
+                <span class="consumption-metric-label">Tobacco:</span>
+                <span class="consumption-metric-val" id="stockRepTotalTobacco">0 kg</span>
+              </div>
+              <div class="consumption-card-metric">
+                <span class="consumption-metric-label" data-i18n="labelPowder">தூள்:</span>
+                <span class="consumption-metric-val" id="stockRepTotalPowder">0 kg</span>
+              </div>
+              <div class="consumption-card-metric">
+                <span class="consumption-metric-label" data-i18n="labelProduction">உற்பத்தி:</span>
+                <span class="consumption-metric-val" id="stockRepTotalCuts">0 Cuts</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Bag Calculator Utility Card -->
+        <div class="card">
+          <div class="card-title-row">
+            <h3 class="card-title">🧮 <span data-i18n="bagCalcTitle">பைகள் கணக்கீட்டு கருவி (Bag Calculator)</span></h3>
+          </div>
+          <p class="section-subtitle" style="margin-bottom: 14px;" data-i18n="bagCalcSub">
+            மொத்த புகையிலையிலிருந்து கழிவு கழித்து எத்தனை பைகள் பிரிக்கலாம் என்ற உடனடி கணக்கீடு
+          </p>
+          <div class="bag-calc-grid">
+            <div class="form-group">
+              <label class="form-label" for="bagCalcTotalKg" data-i18n="bagCalcTotalLabel">மொத்த எடை (Total Weight in kg)</label>
+              <input type="number" id="bagCalcTotalKg" class="form-input" value="35" min="1" step="0.5" oninput="runBagCalculator()">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="bagCalcWastageKg" data-i18n="bagCalcWastageLabel">சராசரி கழிவு (Average Wastage in kg)</label>
+              <input type="number" id="bagCalcWastageKg" class="form-input" value="2" min="0" step="0.1" oninput="runBagCalculator()">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="bagCalcBagSize" data-i18n="bagCalcBagSizeLabel">ஒரு பை அளவு (Bag Size in Grams)</label>
+              <input type="number" id="bagCalcBagSize" class="form-input" value="600" min="100" step="50" oninput="runBagCalculator()">
+            </div>
+          </div>
+          <div class="bag-calc-result">
+            <div>
+              <div style="font-size: 11px; color: var(--text-dim); text-transform: uppercase; font-weight: 600;" data-i18n="bagCalcResultTitle">பிரிக்கக்கூடிய பைகள்</div>
+              <div class="metric-value" style="font-size: 20px; color: var(--accent-green);" id="bagCalcResultBags">55 <span class="metric-unit">Bags</span></div>
+            </div>
+            <div id="bagCalcResultUsable" style="font-size: 13px; color: var(--text-muted); font-weight: 500;">33 kg Usable (33,000g ÷ 600g)</div>
+          </div>
+        </div>
+
+        <!-- Monthly Stock Report & PDF Download Card -->
+        <!-- Stock Audit Report & PDF Download Card -->
+        <div class="card" id="stockReportCard">
+          <div class="card-title-row">
+            <div>
+              <h3 class="card-title">🖼️ <span data-i18n="monthlyStockReportTitle">உள்வரும் சரக்கு அறிக்கை (Incoming Stock Report)</span></h3>
+              <p class="section-subtitle" style="margin-top: 4px; margin-bottom: 0;" data-i18n="monthlyStockReportSub">
+                பொருட்கள் வாரியாக (இலை / தூள்) மற்றும் தேதி வாரியாக உள்வரும் சரக்கு விவரங்கள் மற்றும் படம் (Image) பதிவிறக்கம்
+              </p>
+            </div>
+            <span class="badge badge-amber" id="stockReportActiveMonthBadge">2026-09</span>
+          </div>
+
+          <div class="stock-report-toolbar">
+            <div class="stock-report-filter-row">
+              <div class="stock-report-picker-item">
+                <label for="stockReportFromDate" class="stock-filter-label" data-i18n="reportFilterFromLabel">முதல் (From):</label>
+                <input type="date" id="stockReportFromDate" class="form-input stock-date-input" onchange="onStockReportDateChange()">
+              </div>
+              <div class="stock-report-picker-item">
+                <label for="stockReportToDate" class="stock-filter-label" data-i18n="reportFilterToLabel">வரை (To):</label>
+                <input type="date" id="stockReportToDate" class="form-input stock-date-input" onchange="onStockReportDateChange()">
+              </div>
+              <div class="stock-report-picker-item">
+                <label for="stockReportMaterialFilter" class="stock-filter-label" data-i18n="filterMaterialLabel">பொருள் (Material):</label>
+                <select id="stockReportMaterialFilter" class="form-input stock-material-select" onchange="onStockReportFilterChange()">
+                  <option value="all" data-i18n="filterAllMaterials">அனைத்தும் (All - Leaf & Powder)</option>
+                  <option value="tobacco" data-i18n="filterLeafOnly">புகையிலை / Leaf (All Varieties)</option>
+                  <option value="sona">SONA (Leaf)</option>
+                  <option value="a1">A1 (Leaf)</option>
+                  <option value="super">SUPER (Leaf)</option>
+                  <option value="powder" data-i18n="filterPowderOnly">தூள் / Powder</option>
+                </select>
+              </div>
+              <div class="stock-report-presets">
+                <button type="button" class="btn-preset active" id="btnPresetThisMonth" onclick="setStockReportPreset('this-month')" data-i18n="presetThisMonth">இந்த மாதம்</button>
+                <button type="button" class="btn-preset" id="btnPresetLastMonth" onclick="setStockReportPreset('last-month')" data-i18n="presetLastMonth">கடந்த மாதம்</button>
+                <button type="button" class="btn-preset" id="btnPreset3Months" onclick="setStockReportPreset('3-months')" data-i18n="presetLast3Months">கடந்த 3 மாதங்கள்</button>
+                <button type="button" class="btn-preset" id="btnPresetThisYear" onclick="setStockReportPreset('this-year')" data-i18n="presetThisYear">இந்த வருடம்</button>
+              </div>
+            </div>
+            <div class="stock-report-btn-group">
+              <button type="button" class="btn-primary" id="btnDownloadStockImage" onclick="downloadStockImage()">
+                <span>🖼️</span> <span data-i18n="downloadImageBtn">படம் பதிவிறக்கு (Image)</span>
+              </button>
+              <button type="button" class="btn-secondary" id="btnPreviewStockReport" onclick="previewMonthlyStockReport()">
+                <span>👁️</span> <span data-i18n="previewReportBtn">முன்னோட்டம்</span>
+              </button>
+              <button type="button" class="btn-secondary" id="btnPrintStockReport" onclick="printMonthlyStockReport()">
+                <span>🖨️</span> <span data-i18n="printReportBtn">அச்சிடு</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Quick Summary Snapshot inside the Card -->
+          <div id="stockReportSummarySnapshot" class="stock-report-snapshot-grid">
+            <div class="snapshot-metric">
+              <span class="snapshot-label" data-i18n="snapFilterLabel">தேர்வு (Filter):</span>
+              <strong id="snapMaterialFilter">All (Leaf & Powder)</strong>
+            </div>
+            <div class="snapshot-metric">
+              <span class="snapshot-label" data-i18n="snapEntriesCountLabel">உள்வரும் பதிவுகள் (Entries):</span>
+              <strong id="snapEntriesCount">0</strong>
+            </div>
+            <div class="snapshot-metric">
+              <span class="snapshot-label" data-i18n="snapTobaccoIncomingLabel">Leaf வரவு (Tobacco):</span>
+              <strong id="snapTobaccoIncoming" style="color: var(--accent-green);">0 kg</strong>
+            </div>
+            <div class="snapshot-metric">
+              <span class="snapshot-label" data-i18n="snapPowderIncomingLabel">Powder வரவு (தூள்):</span>
+              <strong id="snapPowderIncoming" style="color: var(--accent-amber);">0 kg</strong>
+            </div>
+            <div class="snapshot-metric">
+              <span class="snapshot-label" data-i18n="snapTotalIncomingLabel">மொத்த வரவு (Total Incoming):</span>
+              <strong id="snapTotalIncoming" style="color: var(--accent-gold); font-size: 16px;">0 kg</strong>
+            </div>
+          </div>
+        </div>
+
+        <!-- Stock Movements Ledger Card -->
+        <div class="card">
+          <div class="card-title-row">
+            <h3 class="card-title">📜 <span data-i18n="movementsTitle">சரக்கு இயக்க வரலாறு (Stock Movements Ledger)</span></h3>
+          </div>
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th data-i18n="colDate">தேதி</th>
+                  <th data-i18n="colItem">பொருள்</th>
+                  <th data-i18n="colMovementType">வகை</th>
+                  <th data-i18n="colQty">அளவு</th>
+                  <th data-i18n="colBalanceAfter">மீதமிருந்த இருப்பு</th>
+                  <th data-i18n="colNotes">விவரம்</th>
+                  <th data-i18n="colActions">செயல்கள்</th>
+                </tr>
+              </thead>
+              <tbody id="stockMovementsTableBody">
+                <tr><td colspan="7" style="text-align:center;" data-i18n="loading">ஏற்றப்படுகிறது...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Modal for Adding / Adjusting Stock -->
+    <div id="stockModal" class="modal-overlay">
+      <div class="modal-dialog">
+        <div class="modal-header">
+          <h3 id="stockModalTitle" style="color: var(--accent-gold); font-size: 16px;" data-i18n="modalAddTitle">சரக்கு சேர்க்க</h3>
+          <button class="modal-close-btn" onclick="closeStockModal()">&times;</button>
+        </div>
+        <form id="stockActionForm" onsubmit="handleStockActionSubmit(event)">
+          <input type="hidden" id="stockActionType" value="add">
+          <div class="form-group">
+            <label class="form-label" for="stockActionItem" data-i18n="modalItemLabel">பொருள் (Item)</label>
+            <select id="stockActionItem" class="form-select" onchange="updateStockModalItemFields()" required>
+              <option value="tobacco" data-i18n="modalItemTobacco">Tobacco (புகையிலை)</option>
+              <option value="powder" data-i18n="modalItemPowder">தூள் (Tobacco Powder)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="stockActionKg" id="stockActionKgLabel" data-i18n="modalKgLabelAdd">அளவு (கிலோ / kg)</label>
+            <input type="number" id="stockActionKg" class="form-input" placeholder="எ.கா: 10" data-i18n-placeholder="kgPlaceholder" step="0.1" min="0.1" required>
+          </div>
+          <div class="form-group" id="stockActionNotesGroup">
+            <label class="form-label" for="stockActionNotes" id="stockActionNotesLabel" data-i18n="modalVarietyLabel">வகை / பிராண்டு (Type / Variety):</label>
+            <input type="text" id="stockActionNotes" class="form-input" placeholder="எ.கா: SONA, A1, SUPER..." list="leafVarietySuggestions" required>
+            <datalist id="leafVarietySuggestions">
+              <option value="SONA">
+              <option value="A1">
+              <option value="SUPER">
+              <option value="Grade A">
+            </datalist>
+          </div>
+          <button type="submit" class="btn-primary" style="margin-top: 10px;">
+              <span>💾</span> <span id="stockActionSubmitBtn" data-i18n="saveBtn">சேமிக்கவும்</span>
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Modal for Editing Stock Movement -->
+    <div id="editStockMovementModal" class="modal-overlay">
+      <div class="modal-dialog">
+        <div class="modal-header">
+          <h3 id="editMovementModalTitle" style="color: var(--accent-gold); font-size: 16px;" data-i18n="editMovementTitle">சரக்கு பதிவு திருத்துதல்</h3>
+          <button class="modal-close-btn" onclick="closeEditStockMovementModal()">&times;</button>
+        </div>
+        <form id="editStockMovementForm" onsubmit="handleEditStockMovementSubmit(event)">
+          <input type="hidden" id="editMovementId">
+          <div class="form-group">
+            <label class="form-label" data-i18n="colItem">பொருள்</label>
+            <input type="text" id="editMovementItem" class="form-input" readonly style="opacity: 0.8; cursor: not-allowed;">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="editMovementDate" data-i18n="colDate">தேதி</label>
+            <input type="date" id="editMovementDate" class="form-input" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="editMovementKg" data-i18n="quantityKgLabel">அளவு (கிலோ / kg)</label>
+            <input type="number" id="editMovementKg" class="form-input" step="0.01" min="0.01" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="editMovementNotes" id="editMovementNotesLabel" data-i18n="modalVarietyLabel">வகை / பிராண்டு (Type / Variety):</label>
+            <input type="text" id="editMovementNotes" class="form-input" placeholder="எ.கா: SONA, A1, SUPER..." list="leafVarietySuggestions" required>
+          </div>
+          <div style="display: flex; gap: 10px; margin-top: 14px;">
+            <button type="button" class="btn-secondary" style="flex: 1;" onclick="closeEditStockMovementModal()" data-i18n="cancelBtn">ரத்து</button>
+            <button type="submit" class="btn-primary" style="flex: 1;" data-i18n="saveBtn">சேமிக்கவும்</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Modal for Previewing Monthly Stock Report -->
+    <div id="stockReportPreviewModal" class="modal-overlay">
+      <div class="modal-dialog modal-lg">
+        <div class="modal-header">
+          <h3 style="color: var(--accent-gold); font-size: 16px;">📑 <span id="reportModalTitle">மாதாந்திர சரக்கு அறிக்கை (Stock Audit Statement)</span></h3>
+          <button class="modal-close-btn" onclick="closeStockReportPreviewModal()">&times;</button>
+        </div>
+        <div class="modal-body-scrollable">
+          <div id="previewReportContainer" class="stock-printable-report-wrapper">
+            <!-- Dynamic Printable HTML will be rendered here -->
+          </div>
+        </div>
+        <div class="modal-actions-row" style="margin-top: 14px; display: flex; justify-content: flex-end; gap: 8px;">
+          <button type="button" class="btn-secondary" onclick="closeStockReportPreviewModal()">
+            <span>✕</span> <span data-i18n="cancelBtn">மூடு</span>
+          </button>
+          <button type="button" class="btn-secondary" onclick="printMonthlyStockReport()">
+            <span>🖨️</span> <span data-i18n="printReportBtn">அச்சிடு</span>
+          </button>
+          <button type="button" class="btn-primary" onclick="downloadStockImage()">
+            <span>🖼️</span> <span data-i18n="downloadImageBtn">படம் பதிவிறக்கு</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Container strictly for generating image / PDF report (behind viewport content with full opacity) -->
+    <div id="pdfOffscreenWrapper" style="position: fixed; left: 0; top: 0; z-index: -9999; pointer-events: none; width: 780px; background: #ffffff;">
+      <div id="pdfPrintableSheet"></div>
+    </div>
+
+    <!-- Bottom Navigation Bar for Mobile Viewports -->
+    <nav class="bottom-nav">
+      <a href="/dashboard" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        <span data-i18n="navDashboard">முகப்பு</span>
+      </a>
+      <a href="/production" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M2 20h20M7 20V10l5 3V4l7 5v11"/></svg>
+        <span data-i18n="navProduction">உற்பத்தி</span>
+      </a>
+      <a href="/stock" class="nav-item active">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+        <span data-i18n="navStock">இருப்பு</span>
+      </a>
+      <a href="/expenses" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        <span data-i18n="navExpenses">செலவுகள்</span>
+      </a>
+      <a href="/export" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>
+        <span data-i18n="navExport">ஏற்றுமதி</span>
+      </a>
+      <a href="/chat" class="nav-item chat-tab">
+        <span class="chat-pulse-badge"></span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        <span data-i18n="navChat">AI சாட்</span>
+      </a>
+      <a href="/settings" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        <span data-i18n="navSettings">அமைப்புகள்</span>
+      </a>
+    </nav>
+
+  </div>
+
+  <!-- Scripts -->
+  <script src="/js/html2canvas.min.js"></script>
+  <script src="/js/html2pdf.bundle.min.js"></script>
+  <script src="/js/i18n.js"></script>
+  <script src="/js/common.js"></script>
+  <script src="/js/stock.js"></script>
+</body>
+</html>

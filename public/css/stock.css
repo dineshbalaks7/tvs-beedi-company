@@ -1,0 +1,600 @@
+/* ===================================================================
+   TVS Beedi Company - Stock Specific Stylesheet
+   Raw Material Cards, Consumption Reporting & Ledger
+   =================================================================== */
+
+.stock-action-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.stock-action-buttons {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+/* Consumption Reporting Matrix Grid */
+.consumption-report-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+@media (min-width: 640px) {
+  .consumption-report-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .consumption-report-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.consumption-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.consumption-card-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent-gold);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.consumption-card-metric {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  padding: 3px 0;
+  border-bottom: 1px dashed rgba(0, 0, 0, 0.06);
+}
+
+[data-theme="dark"] .consumption-card-metric {
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+
+.consumption-metric-label {
+  color: var(--text-muted);
+}
+
+.consumption-metric-val {
+  font-family: var(--font-en);
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+/* Bag Calculator Box */
+.bag-calc-grid {
+  display: grid;
+  grid-template-columns: repeat(1, 1fr);
+  gap: 12px;
+}
+
+@media (min-width: 640px) {
+  .bag-calc-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.bag-calc-result {
+  margin-top: 14px;
+  padding: 12px 14px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.btn-action-edit {
+  min-height: 28px;
+  padding: 2px 8px;
+  font-size: 12px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  cursor: pointer;
+  color: var(--text-main);
+  transition: all 0.2s ease;
+}
+
+.btn-action-edit:hover {
+  background: var(--accent-amber);
+  color: #ffffff;
+  border-color: var(--accent-amber);
+}
+
+/* ===================================================================
+   Monthly Stock Report Toolbar, Snapshot & Printable PDF Styles
+   =================================================================== */
+
+.stock-report-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+  padding: 14px 16px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+}
+
+.stock-report-filter-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.stock-report-picker-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stock-filter-label {
+  margin-bottom: 0;
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.stock-date-input {
+  min-width: 140px;
+  padding: 6px 10px;
+  font-family: var(--font-en);
+  font-weight: 600;
+  font-size: 13px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+}
+
+.stock-date-input:focus {
+  outline: none;
+  border-color: var(--accent-amber);
+}
+
+.stock-report-presets {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.btn-preset {
+  padding: 5px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 20px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.btn-preset:hover {
+  border-color: var(--accent-amber);
+  color: var(--accent-gold);
+}
+
+.btn-preset.active {
+  background: var(--accent-amber);
+  color: #ffffff;
+  border-color: var(--accent-amber);
+  font-weight: 700;
+}
+
+.stock-report-btn-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.stock-report-snapshot-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-top: 14px;
+}
+
+@media (min-width: 640px) {
+  .stock-report-snapshot-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.snapshot-metric {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.snapshot-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.snapshot-metric strong {
+  font-size: 15px;
+  font-family: var(--font-en);
+}
+
+.stock-material-select {
+  padding: 6px 10px;
+  font-size: 13px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  min-width: 170px;
+}
+
+.stock-material-select:focus {
+  outline: none;
+  border-color: var(--accent-amber);
+}
+
+/* Modal Large for Printable Preview */
+.modal-lg {
+  max-width: 860px;
+  width: 96%;
+}
+
+.modal-body-scrollable {
+  max-height: 75vh;
+  overflow-y: auto;
+  padding: 6px 4px;
+}
+
+/* TVS Clean Minimal Stock PDF Document */
+.tvs-pdf-container {
+  width: 100%;
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 30px 36px;
+  background: #ffffff;
+  color: #111827;
+  font-family: 'Mukta Malar', 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  box-sizing: border-box;
+}
+
+.tvs-pdf-header {
+  text-align: center;
+  margin-bottom: 26px;
+  padding-bottom: 4px;
+}
+
+.tvs-brand-title {
+  font-size: 32px;
+  font-weight: 900;
+  letter-spacing: 2px;
+  color: #0f172a;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.tvs-month-block {
+  margin-bottom: 28px;
+  page-break-inside: avoid;
+}
+
+.tvs-month-title {
+  font-size: 18px;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 0 0 12px 0;
+  padding-bottom: 4px;
+}
+
+.tvs-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 12px;
+  font-size: 14.5px;
+}
+
+.tvs-table th,
+.tvs-table td {
+  border: 1px solid #334155;
+  padding: 8px 16px;
+  line-height: 1.45;
+}
+
+.tvs-table th {
+  background-color: #f8fafc;
+  color: #0f172a;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.tvs-table td.col-date,
+.tvs-table th.col-date {
+  width: 24%;
+  text-align: left;
+}
+
+.tvs-table td.col-material,
+.tvs-table th.col-material {
+  width: 25%;
+  text-align: left;
+}
+
+.tvs-table td.col-type,
+.tvs-table th.col-type {
+  width: 31%;
+  text-align: left;
+}
+
+.tvs-table td.col-kg,
+.tvs-table th.col-kg {
+  width: 20%;
+  text-align: right;
+  font-weight: 600;
+  letter-spacing: normal;
+}
+
+.tvs-month-total-line {
+  font-size: 15px;
+  font-weight: 800;
+  color: #0f172a;
+  margin-top: 10px;
+  margin-bottom: 8px;
+  padding-left: 2px;
+}
+
+.tvs-final-total-line {
+  font-size: 17px;
+  font-weight: 900;
+  color: #0f172a;
+  margin-top: 26px;
+  padding-top: 14px;
+  border-top: 2px solid #0f172a;
+  letter-spacing: 0.3px;
+}
+
+/* Printable Stock Audit Sheet (Used both for preview and PDF export) */
+.stock-printable-report-wrapper {
+  background: #ffffff;
+  color: #0f172a;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+
+.stock-audit-sheet {
+  padding: 24px;
+  background: #ffffff;
+  color: #0f172a;
+  font-family: 'Outfit', 'Mukta Malar', sans-serif;
+  line-height: 1.4;
+}
+
+.stock-audit-sheet * {
+  box-sizing: border-box;
+}
+
+.report-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding-bottom: 14px;
+  border-bottom: 2px solid #d97706;
+  margin-bottom: 14px;
+}
+
+.report-brand-title {
+  font-size: 20px;
+  font-weight: 800;
+  color: #92400e;
+  letter-spacing: 0.5px;
+}
+
+.report-brand-sub {
+  font-size: 11px;
+  color: #64748b;
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+.report-header-badge {
+  text-align: right;
+}
+
+.report-badge-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #d97706;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.report-badge-month {
+  font-size: 15px;
+  font-weight: 800;
+  color: #0f172a;
+  margin-top: 2px;
+}
+
+.report-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px 16px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 10px 14px;
+  font-size: 11px;
+  color: #334155;
+  margin-bottom: 16px;
+}
+
+.report-section-title {
+  font-size: 12px;
+  font-weight: 800;
+  color: #b45309;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin: 14px 0 8px 0;
+  padding-left: 6px;
+  border-left: 3px solid #d97706;
+}
+
+.report-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+  margin-bottom: 14px;
+}
+
+.report-table th {
+  background: #f1f5f9;
+  color: #0f172a;
+  font-weight: 700;
+  text-align: left;
+  padding: 8px 8px;
+  border: 1px solid #cbd5e1;
+  font-size: 10px;
+}
+
+.report-table th.header-group {
+  text-align: center;
+  background: #e2e8f0;
+  font-size: 11px;
+  color: #1e293b;
+}
+
+.report-table td {
+  padding: 6px 8px;
+  border: 1px solid #e2e8f0;
+  color: #334155;
+  font-size: 10.5px;
+}
+
+.report-table tr:nth-child(even) {
+  background: #f8fafc;
+}
+
+.report-table tr.report-total-row {
+  background: #fef3c7 !important;
+  font-weight: 800;
+  color: #92400e;
+  border-top: 2px solid #d97706;
+}
+
+.report-table tr.report-total-row td {
+  border-top: 2px solid #d97706;
+  color: #92400e;
+  font-weight: 800;
+}
+
+.report-prod-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.report-prod-box {
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.report-prod-label {
+  font-size: 10px;
+  color: #64748b;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.report-prod-val {
+  font-size: 14px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.report-footer {
+  margin-top: 24px;
+  padding-top: 14px;
+  border-top: 1px solid #cbd5e1;
+}
+
+.report-cert-text {
+  font-size: 10px;
+  color: #64748b;
+  font-style: italic;
+  margin-bottom: 24px;
+}
+
+.report-signatures {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+  text-align: center;
+  font-size: 10px;
+  color: #475569;
+  font-weight: 600;
+}
+
+.sig-line {
+  border-bottom: 1px solid #94a3b8;
+  margin-bottom: 6px;
+  height: 35px;
+}
+
+/* Print Specific Media Rules */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #previewReportContainer,
+  #previewReportContainer * {
+    visibility: visible;
+  }
+  #previewReportContainer {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    box-shadow: none;
+  }
+  .modal-actions-row,
+  .modal-header,
+  .modal-close-btn {
+    display: none !important;
+  }
+}

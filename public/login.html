@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sign In | TVS Beedi Company</title>
+  <link rel="icon" type="image/png" href="/images/logo.png">
+  <link rel="stylesheet" href="/css/login.css">
+</head>
+<body>
+  <main class="login-page">
+    <section class="login-card" aria-labelledby="loginTitle">
+      <div class="login-brand">
+        <img src="/images/logo.png" alt="TVS Beedi Company logo">
+        <div>
+          <strong>TVS Beedi Company</strong>
+          <span>Internal Management Portal</span>
+        </div>
+      </div>
+      <div class="login-heading">
+        <p class="login-eyebrow">SECURE ACCESS</p>
+        <h1 id="loginTitle">Welcome back</h1>
+        <p>Sign in to manage production, stock, expenses, and exports.</p>
+      </div>
+      <form id="loginForm">
+        <label for="username">Username</label>
+        <input id="username" name="username" type="text" autocomplete="username" required autofocus>
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" required>
+        <p id="loginError" class="login-error" role="alert" hidden></p>
+        <button id="loginButton" type="submit">Sign in</button>
+      </form>
+    </section>
+  </main>
+  <script>
+    const form = document.getElementById('loginForm');
+    const button = document.getElementById('loginButton');
+    const error = document.getElementById('loginError');
+    form.addEventListener('submit', async event => {
+      event.preventDefault();
+      error.hidden = true;
+      button.disabled = true;
+      button.textContent = 'Signing in...';
+      try {
+        const response = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            username: form.username.value.trim(),
+            password: form.password.value
+          })
+        });
+        if (!response.ok) throw new Error('Invalid username or password');
+        window.location.href = '/dashboard';
+      } catch (err) {
+        error.textContent = err.message;
+        error.hidden = false;
+        button.disabled = false;
+        button.textContent = 'Sign in';
+      }
+    });
+  </script>
+</body>
+</html>

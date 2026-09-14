@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="ta">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>TVS பீடி கம்பெனி - அமைப்புகள் | Settings</title>
+  <meta name="description" content="TVS Beedi Company - Multipliers, rates, box conversions, and business thresholds settings.">
+  <link rel="icon" type="image/png" href="/images/logo.png">
+  <link rel="apple-touch-icon" href="/images/logo.png">
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Mukta+Malar:wght@400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Stylesheets -->
+  <link rel="stylesheet" href="/css/common.css">
+  <link rel="stylesheet" href="/css/settings.css">
+</head>
+<body>
+  <div class="app-container">
+    
+    <!-- Top App Header -->
+    <header class="app-header">
+      <div class="brand-wrapper">
+        <div class="brand-logo-wrap">
+          <img src="/images/logo.png" alt="TVS Beedi Logo" class="brand-logo-img">
+        </div>
+        <div class="brand-text">
+          <h1 data-i18n="companyName">TVS பீடி கம்பெனி</h1>
+          <p><span class="status-dot"></span> <span data-i18n="companyTagline">உள் நிர்வாக தளம்</span></p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button id="logoutBtn" class="lang-btn" onclick="logout()" title="Sign out">↪ Logout</button>
+        <div id="langSwitcher" class="lang-switcher-pill" onclick="toggleLanguage()" role="button" aria-label="Switch Language" title="Switch Language / மொழியை மாற்ற">
+          <span id="langChipTa" class="lang-segment active">தமிழ்</span>
+          <span id="langChipEn" class="lang-segment">EN</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Toast Container -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <!-- Main Content: Settings -->
+    <main class="main-content">
+      <section id="view-settings" class="tab-view active">
+        <div class="section-title-wrap">
+          <h2 class="section-title">⚙️ <span data-i18n="settingsTitle">கணக்கீட்டு அமைப்புகள்</span></h2>
+          <p class="section-subtitle" data-i18n="settingsSub">கட்டை பெருக்கிகள், மூலப்பொருள் விகிதங்கள் & எச்சரிக்கை அமைப்புகள்</p>
+        </div>
+
+        <div class="card settings-card">
+          <form id="settingsForm" onsubmit="handleSettingsSubmit(event)">
+            
+            <div class="settings-section-divider">
+              <span>📦</span> <span data-i18n="boxSettingsSection">கட்டை & கட்டு மாற்றங்கள் (Box Multipliers)</span>
+            </div>
+
+            <div class="form-grid">
+              <div class="form-group">
+                <label class="form-label" for="setBeedisPerBox" data-i18n="beedisPerBoxSetting">1 கட்டைக்கு பீடிகள் (Beedis per Box)</label>
+                <input type="number" id="setBeedisPerBox" class="form-input" value="6000" min="100" required>
+                <div class="settings-note">300 கட்டுகள் × 20 = 6,000 பீடிகள்</div>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="setCutsPerBox" data-i18n="cutsPerBoxSetting">1 கட்டைக்கு கட்டுகள் (Cuts per Box)</label>
+                <input type="number" id="setCutsPerBox" class="form-input" value="300" min="1" required>
+                <div class="settings-note">1 Box = 300 Cuts</div>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="setBeedisPerCut" data-i18n="beedisPerCutSetting">1 கட்டுக்கு பீடிகள் (Beedis per Cut)</label>
+              <input type="number" id="setBeedisPerCut" class="form-input" value="20" min="1" required>
+            </div>
+
+            <div class="settings-section-divider">
+              <span>💰</span> <span data-i18n="ratesSettingsSection">மூலப்பொருள் & கூலி விகிதங்கள் (1,000 பீடிக்கு)</span>
+            </div>
+
+            <div class="form-grid">
+              <div class="form-group">
+                <label class="form-label" for="setTobaccoPer1000" data-i18n="tobaccoPer1000Setting">Tobacco (கிராமில் / Grams)</label>
+                <input type="number" id="setTobaccoPer1000" class="form-input" value="600" min="1" required>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="setPowderPer1000" data-i18n="powderPer1000Setting">தூள் (கிராமில் / Grams)</label>
+                <input type="number" id="setPowderPer1000" class="form-input" value="200" min="1" required>
+              </div>
+            </div>
+
+            <div class="form-grid">
+              <div class="form-group">
+                <label class="form-label" for="setSalaryPer1000" data-i18n="salaryPer1000Setting">தொழிலாளர் கூலி (₹)</label>
+                <input type="number" id="setSalaryPer1000" class="form-input" value="320" min="1" required>
+                <div class="settings-note">1 Box கூலி: ₹1,920</div>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="setRatePer1000" data-i18n="ratePer1000Setting">கம்பெனி Rate மதிப்பு (₹)</label>
+                <input type="number" id="setRatePer1000" class="form-input" value="340" min="1" required>
+                <div class="settings-note">1 Box மதிப்பு: ₹2,040</div>
+              </div>
+            </div>
+
+            <div class="settings-section-divider">
+              <span>⚠️</span> <span data-i18n="thresholdsSettingsSection">கையிருப்பு & பை அளவு எச்சரிக்கைகள்</span>
+            </div>
+
+            <div class="form-grid">
+              <div class="form-group">
+                <label class="form-label" for="setAvgWastage" data-i18n="avgWastageSetting">சராசரி கழிவு (Average Wastage in kg)</label>
+                <input type="number" id="setAvgWastage" class="form-input" value="2" min="0" step="0.1" required>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="setBagSize" data-i18n="bagSizeSetting">ஒரு பை அளவு (Bag Size in Grams)</label>
+                <input type="number" id="setBagSize" class="form-input" value="600" min="100" required>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="setLowStock" data-i18n="lowStockSetting">குறைந்த இருப்பு எச்சரிக்கை அளவு (Low Stock Alert in kg)</label>
+              <input type="number" id="setLowStock" class="form-input" value="5" min="1" required>
+            </div>
+
+            <button type="submit" class="btn-primary" style="margin-top: 14px;">
+              <span>💾</span> <span data-i18n="saveSettingsBtn">அமைப்புகளைச் சேமிக்கவும்</span>
+            </button>
+          </form>
+        </div>
+
+        <div class="card settings-card password-card">
+          <div class="settings-section-divider">
+            <span>🔐</span> <span>Reset Password</span>
+          </div>
+          <form id="changePasswordForm" onsubmit="handleChangePassword(event)">
+            <div class="form-group">
+              <label class="form-label" for="newPassword">New Password</label>
+              <input type="password" id="newPassword" class="form-input" minlength="8" autocomplete="new-password" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="confirmPassword">Confirm New Password</label>
+              <input type="password" id="confirmPassword" class="form-input" minlength="8" autocomplete="new-password" required>
+            </div>
+            <button type="submit" class="btn-secondary" style="margin-top: 6px;">Reset Password</button>
+          </form>
+        </div>
+      </section>
+    </main>
+
+    <!-- Bottom Navigation Bar for Mobile Viewports -->
+    <nav class="bottom-nav">
+      <a href="/dashboard" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        <span data-i18n="navDashboard">முகப்பு</span>
+      </a>
+      <a href="/production" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M2 20h20M7 20V10l5 3V4l7 5v11"/></svg>
+        <span data-i18n="navProduction">உற்பத்தி</span>
+      </a>
+      <a href="/stock" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+        <span data-i18n="navStock">இருப்பு</span>
+      </a>
+      <a href="/expenses" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        <span data-i18n="navExpenses">செலவுகள்</span>
+      </a>
+      <a href="/export" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>
+        <span data-i18n="navExport">ஏற்றுமதி</span>
+      </a>
+      <a href="/chat" class="nav-item chat-tab">
+        <span class="chat-pulse-badge"></span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        <span data-i18n="navChat">AI சாட்</span>
+      </a>
+      <a href="/settings" class="nav-item active">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        <span data-i18n="navSettings">அமைப்புகள்</span>
+      </a>
+    </nav>
+
+  </div>
+
+  <!-- Scripts -->
+  <script src="/js/i18n.js"></script>
+  <script src="/js/common.js"></script>
+  <script src="/js/settings.js"></script>
+</body>
+</html>

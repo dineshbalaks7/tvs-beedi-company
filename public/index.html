@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="ta">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>TVS பீடி கம்பெனி - முகப்பு | Dashboard</title>
+  <meta name="description" content="TVS Beedi Company internal management portal - Dashboard & Analytics.">
+  <link rel="icon" type="image/png" href="/images/logo.png">
+  <link rel="apple-touch-icon" href="/images/logo.png">
+  
+  <!-- Fonts: Mukta Malar (Tamil) & Outfit (Latin/Numbers) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Mukta+Malar:wght@400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Common & Page-specific CSS -->
+  <link rel="stylesheet" href="/css/common.css">
+  <link rel="stylesheet" href="/css/dashboard.css">
+</head>
+<body>
+  <div class="app-container">
+    
+    <!-- Top App Header -->
+    <header class="app-header">
+      <div class="brand-wrapper">
+        <div class="brand-logo-wrap">
+          <img src="/images/logo.png" alt="TVS Beedi Logo" class="brand-logo-img">
+        </div>
+        <div class="brand-text">
+          <h1 data-i18n="companyName">TVS பீடி கம்பெனி</h1>
+          <p><span class="status-dot"></span> <span data-i18n="companyTagline">உள் நிர்வாக தளம்</span></p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button id="themeToggleBtn" class="lang-btn" onclick="toggleTheme()" title="Theme">🌙 இரவு</button>
+        <div id="langSwitcher" class="lang-switcher-pill" onclick="toggleLanguage()" role="button" aria-label="Switch Language" title="Switch Language / மொழியை மாற்ற">
+          <span id="langChipTa" class="lang-segment active">தமிழ்</span>
+          <span id="langChipEn" class="lang-segment">EN</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Toast Container -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <!-- Main Content Area: Dashboard -->
+    <main class="main-content">
+      <section id="view-dashboard" class="tab-view active">
+        <div class="section-title-wrap">
+          <h2 class="section-title">📊 <span id="dashMainTitle" data-i18n="todayTitle">இன்றைய நிலவரம்</span></h2>
+          <p class="section-subtitle" id="dashMainSubtitle" data-i18n="todaySub">இன்றைய நேரடி உற்பத்தி & நிதி விவரங்கள்</p>
+        </div>
+
+        <!-- Period Switcher Tabs (Day-wise / Weekly / Monthly) -->
+        <div class="dash-period-container">
+          <div class="dash-period-pills">
+            <button type="button" class="dash-period-pill active" id="btnPeriodDay" onclick="setDashboardPeriod('day')">
+              <span>📅</span> <span data-i18n="dashDayWise">இன்று (Day-wise)</span>
+            </button>
+            <button type="button" class="dash-period-pill" id="btnPeriodWeek" onclick="setDashboardPeriod('week')">
+              <span>📆</span> <span data-i18n="dashWeekWise">இந்த வாரம் (Weekly)</span>
+            </button>
+            <button type="button" class="dash-period-pill" id="btnPeriodMonth" onclick="setDashboardPeriod('month')">
+              <span>📊</span> <span data-i18n="dashMonthWise">இந்த மாதம் (Monthly)</span>
+            </button>
+          </div>
+          <div class="dash-period-badge" id="dashPeriodActiveBadge">
+            <span class="pulse-dot"></span> <span id="dashPeriodBadgeText">Live: Day-wise</span>
+          </div>
+        </div>
+
+        <!-- Quick Actions Row -->
+        <div class="quick-actions-bar">
+          <a class="quick-action-btn" href="/production">
+            <span>🏭</span> <span data-i18n="quickAddProd">உற்பத்தி சேர்</span>
+          </a>
+          <a class="quick-action-btn" href="/export">
+            <span>🚚</span> <span data-i18n="quickAddExport">ஏற்றுமதி சேர்</span>
+          </a>
+          <a class="quick-action-btn" href="/expenses">
+            <span>💸</span> <span data-i18n="quickAddExp">செலவு சேர்</span>
+          </a>
+          <a class="quick-action-btn" href="/stock">
+            <span>📦</span> <span data-i18n="quickAddStock">சரக்கு இருப்பு</span>
+          </a>
+          <a class="quick-action-btn" href="/chat">
+            <span>💬</span> <span data-i18n="quickOpenChat">AI உதவியாளர்</span>
+          </a>
+        </div>
+
+        <!-- Low Stock Alert Banner -->
+        <div id="dashboardStockAlert" class="alert-banner alert-danger" style="display: none;">
+          <span>⚠️</span>
+          <span id="stockAlertText" data-i18n="lowStockAlert">இருப்பு குறைவாக உள்ளது! உடனடியாக சரக்கு சேர்க்கவும்.</span>
+        </div>
+
+        <!-- Today Metrics Grid -->
+        <div class="metrics-grid">
+          <div class="metric-card">
+            <div class="metric-card-top">
+              <span class="metric-label" id="metricLabelBoxes" data-i18n="todayBoxes">இன்று கட்டை (Boxes)</span>
+              <div class="dash-metric-compare" id="compareBadgeBoxes"></div>
+            </div>
+            <div class="metric-value" id="dashTodayBoxes">0 <span class="metric-unit" data-i18n="unitBoxes">Boxes</span></div>
+            <div class="metric-sub" id="dashTodayBoxesSub">0 கட்டுகள் (300/Box)</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-card-top">
+              <span class="metric-label" id="metricLabelBeedis" data-i18n="todayBeedis">இன்று பீடிகள்</span>
+              <div class="dash-metric-compare" id="compareBadgeBeedis"></div>
+            </div>
+            <div class="metric-value" id="dashTodayBeedis">0 <span class="metric-unit">Pcs</span></div>
+            <div class="metric-sub" id="dashTodayBeedisRatio" data-i18n="ratioBeedisPerBox">1 கட்டை = 6,000 பீடிகள்</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-card-top">
+              <span class="metric-label" id="metricLabelTobacco" data-i18n="todayTobacco">Tobacco பயன்பாடு</span>
+              <div class="dash-metric-compare" id="compareBadgeTobacco"></div>
+            </div>
+            <div class="metric-value" id="dashTodayTobacco">0.0 <span class="metric-unit">kg</span></div>
+            <div class="metric-sub" data-i18n="ratioTobacco">600g / 1,000 பீடி</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-card-top">
+              <span class="metric-label" id="metricLabelPowder" data-i18n="todayPowder">தூள் பயன்பாடு</span>
+              <div class="dash-metric-compare" id="compareBadgePowder"></div>
+            </div>
+            <div class="metric-value" id="dashTodayPowder">0.0 <span class="metric-unit">kg</span></div>
+            <div class="metric-sub" data-i18n="ratioPowder">200g / 1,000 பீடி</div>
+          </div>
+          <div class="metric-card highlight-rate">
+            <div class="metric-card-top">
+              <span class="metric-label" id="metricLabelRate" data-i18n="todayRate">இன்றைய Rate மதிப்பு</span>
+              <div class="dash-metric-compare" id="compareBadgeRate"></div>
+            </div>
+            <div class="metric-value" id="dashTodayRate">₹0</div>
+            <div class="metric-sub" data-i18n="ratioRate">₹340 / 1,000 பீடி</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-card-top">
+              <span class="metric-label" id="metricLabelSalary" data-i18n="todaySalary">இன்றைய சம்பளம்</span>
+              <div class="dash-metric-compare" id="compareBadgeSalary"></div>
+            </div>
+            <div class="metric-value" id="dashTodaySalary">₹0</div>
+            <div class="metric-sub" data-i18n="ratioSalary">₹320 / 1,000 பீடி</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-card-top">
+              <span class="metric-label" id="metricLabelExpenses" data-i18n="todayExpenses">இன்றைய செலவுகள்</span>
+              <div class="dash-metric-compare" id="compareBadgeExpenses"></div>
+            </div>
+            <div class="metric-value" id="dashTodayExpenses">₹0</div>
+            <div class="metric-sub" id="dashTodayExpCount">0 செலவு பதிவுகள்</div>
+          </div>
+          <div class="metric-card highlight-profit">
+            <div class="metric-card-top">
+              <span class="metric-label" id="metricLabelProfit" data-i18n="todayProfit">இன்றைய நிகர லாபம்</span>
+              <div class="dash-metric-compare" id="compareBadgeProfit"></div>
+            </div>
+            <div class="metric-value" id="dashTodayProfit">₹0</div>
+            <div class="metric-sub" id="dashTodayMargin">Margin: 0%</div>
+          </div>
+        </div>
+
+        <!-- Profit Transparency Banner -->
+        <div class="profit-banner">
+          <div class="card-title" id="dashProfitFormulaTitle" data-i18n="todayProfit">இன்றைய நிகர லாபம் (Profit)</div>
+          <div class="profit-formula-display">
+            <div class="formula-step">
+              <div class="formula-title" data-i18n="todayRate">Rate மதிப்பு</div>
+              <div class="formula-val" id="dashCalcRate">₹0</div>
+            </div>
+            <div class="formula-sign">−</div>
+            <div class="formula-step">
+              <div class="formula-title" data-i18n="todaySalary">சம்பளம்</div>
+              <div class="formula-val" id="dashCalcSalary">₹0</div>
+            </div>
+            <div class="formula-sign">−</div>
+            <div class="formula-step">
+              <div class="formula-title" data-i18n="todayExpenses">செலவுகள்</div>
+              <div class="formula-val" id="dashCalcExpenses">₹0</div>
+            </div>
+            <div class="formula-sign">=</div>
+            <div class="formula-step">
+              <div class="formula-title" data-i18n="todayProfit">நிகர லாபம்</div>
+              <div class="formula-val" style="color: var(--accent-green);" id="dashCalcProfit">₹0</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Executive Period Comparison Breakdown Card -->
+        <div class="card comparison-card" id="periodComparisonCard">
+          <div class="card-title-row">
+            <div>
+              <h3 class="card-title">⚖️ <span data-i18n="dashComparisonTitle">காலக்கட்ட ஒப்பீடு & வளர்ச்சி பகுப்பாய்வு</span></h3>
+              <p class="section-subtitle" id="comparisonSubtitle" data-i18n="dashComparisonSub" style="margin-top: 4px; margin-bottom: 0;">
+                முந்தைய காலக்கட்டத்துடன் நேரடி ஒப்பீடு (Previous Period Comparison)
+              </p>
+            </div>
+            <span class="chart-tag" id="comparisonPeriodTag">This Week vs Last Week</span>
+          </div>
+
+          <div class="comparison-grid">
+            <div class="comp-item">
+              <div class="comp-item-header">
+                <span class="comp-metric-name" data-i18n="boxesDisplay">கட்டை (Boxes)</span>
+                <span class="comp-growth-pill" id="compGrowthBoxes">+0 Boxes</span>
+              </div>
+              <div class="comp-values-row">
+                <div class="comp-col">
+                  <span class="comp-col-label" data-i18n="currentPeriodTitle">தற்போதைய காலம்</span>
+                  <span class="comp-val current" id="compCurBoxes">0 Boxes</span>
+                </div>
+                <div class="comp-divider">vs</div>
+                <div class="comp-col">
+                  <span class="comp-col-label" data-i18n="previousPeriodTitle">முந்தைய காலம்</span>
+                  <span class="comp-val prev" id="compPrevBoxes">0 Boxes</span>
+                </div>
+              </div>
+              <div class="comp-delta-text" id="compDeltaBoxes">Δ 0 Boxes</div>
+            </div>
+
+            <div class="comp-item">
+              <div class="comp-item-header">
+                <span class="comp-metric-name" data-i18n="beedisDisplay">பீடிகள்</span>
+                <span class="comp-growth-pill" id="compGrowthBeedis">+0 Pcs</span>
+              </div>
+              <div class="comp-values-row">
+                <div class="comp-col">
+                  <span class="comp-col-label" data-i18n="currentPeriodTitle">தற்போதைய காலம்</span>
+                  <span class="comp-val current" id="compCurBeedis">0 Pcs</span>
+                </div>
+                <div class="comp-divider">vs</div>
+                <div class="comp-col">
+                  <span class="comp-col-label" data-i18n="previousPeriodTitle">முந்தைய காலம்</span>
+                  <span class="comp-val prev" id="compPrevBeedis">0 Pcs</span>
+                </div>
+              </div>
+              <div class="comp-delta-text" id="compDeltaBeedis">Δ 0 Pcs</div>
+            </div>
+
+            <div class="comp-item highlight-gold">
+              <div class="comp-item-header">
+                <span class="comp-metric-name" data-i18n="rateDisplay">Rate மதிப்பு</span>
+                <span class="comp-growth-pill" id="compGrowthRate">+₹0</span>
+              </div>
+              <div class="comp-values-row">
+                <div class="comp-col">
+                  <span class="comp-col-label" data-i18n="currentPeriodTitle">தற்போதைய காலம்</span>
+                  <span class="comp-val current" id="compCurRate">₹0</span>
+                </div>
+                <div class="comp-divider">vs</div>
+                <div class="comp-col">
+                  <span class="comp-col-label" data-i18n="previousPeriodTitle">முந்தைய காலம்</span>
+                  <span class="comp-val prev" id="compPrevRate">₹0</span>
+                </div>
+              </div>
+              <div class="comp-delta-text" id="compDeltaRate">Δ ₹0</div>
+            </div>
+
+            <div class="comp-item">
+              <div class="comp-item-header">
+                <span class="comp-metric-name" data-i18n="salaryDisplay">கூலி (Salary)</span>
+                <span class="comp-growth-pill" id="compGrowthSalary">+₹0</span>
+              </div>
+              <div class="comp-values-row">
+                <div class="comp-col">
+                  <span class="comp-col-label" data-i18n="currentPeriodTitle">தற்போதைய காலம்</span>
+                  <span class="comp-val current" id="compCurSalary">₹0</span>
+                </div>
+                <div class="comp-divider">vs</div>
+                <div class="comp-col">
+                  <span class="comp-col-label" data-i18n="previousPeriodTitle">முந்தைய காலம்</span>
+                  <span class="comp-val prev" id="compPrevSalary">₹0</span>
+                </div>
+              </div>
+              <div class="comp-delta-text" id="compDeltaSalary">Δ ₹0</div>
+            </div>
+
+            <div class="comp-item">
+              <div class="comp-item-header">
+                <span class="comp-metric-name" data-i18n="expensesDisplay">செலவுகள்</span>
+                <span class="comp-growth-pill" id="compGrowthExpenses">+₹0</span>
+              </div>
+              <div class="comp-values-row">
+                <div class="comp-col">
+                  <span class="comp-col-label" data-i18n="currentPeriodTitle">தற்போதைய காலம்</span>
+                  <span class="comp-val current" id="compCurExpenses">₹0</span>
+                </div>
+                <div class="comp-divider">vs</div>
+                <div class="comp-col">
+                  <span class="comp-col-label" data-i18n="previousPeriodTitle">முந்தைய காலம்</span>
+                  <span class="comp-val prev" id="compPrevExpenses">₹0</span>
+                </div>
+              </div>
+              <div class="comp-delta-text" id="compDeltaExpenses">Δ ₹0</div>
+            </div>
+
+            <div class="comp-item highlight-profit">
+              <div class="comp-item-header">
+                <span class="comp-metric-name" data-i18n="netProfitDisplay">நிகர லாபம்</span>
+                <span class="comp-growth-pill" id="compGrowthProfit">+₹0</span>
+              </div>
+              <div class="comp-values-row">
+                <div class="comp-col">
+                  <span class="comp-col-label" data-i18n="currentPeriodTitle">தற்போதைய காலம்</span>
+                  <span class="comp-val current" id="compCurProfit">₹0</span>
+                </div>
+                <div class="comp-divider">vs</div>
+                <div class="comp-col">
+                  <span class="comp-col-label" data-i18n="previousPeriodTitle">முந்தைய காலம்</span>
+                  <span class="comp-val prev" id="compPrevProfit">₹0</span>
+                </div>
+              </div>
+              <div class="comp-delta-text" id="compDeltaProfit">Δ ₹0</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Dedicated Bar Charts Section: Production, Export & Profit -->
+        <div class="charts-section-grid">
+          <!-- 1. Production Bar Chart Card -->
+          <div class="card chart-card">
+            <div class="card-title-row">
+              <div>
+                <h3 class="card-title">📦 <span id="chartProdBarTitle" data-i18n="chartProdTrackingTitle">உற்பத்தி கண்காணிப்பு</span></h3>
+                <p class="section-subtitle" style="margin: 4px 0 0;" data-i18n="chartProdTrackingSub">முந்தைய உற்பத்தி போக்கு & பகுப்பாய்வு</p>
+              </div>
+              <div class="chart-filter-group" id="dashProdChartFilterGroup">
+                <button type="button" class="chart-filter-btn active" id="dashProdFilterDay" onclick="switchDashboardBarChartFilter('prod', 'day')">📅 <span data-i18n="chartDayFilter">நாள்</span></button>
+                <button type="button" class="chart-filter-btn" id="dashProdFilterWeek" onclick="switchDashboardBarChartFilter('prod', 'week')">📆 <span data-i18n="chartWeekFilter">வாரம்</span></button>
+                <button type="button" class="chart-filter-btn" id="dashProdFilterMonth" onclick="switchDashboardBarChartFilter('prod', 'month')">🗓️ <span data-i18n="chartMonthFilter">மாதம்</span></button>
+              </div>
+            </div>
+            <div class="chart-canvas-wrapper" style="height: 280px;">
+              <canvas id="dashChartProdBar"></canvas>
+              <p class="chart-status" id="dashProdChartStatus" hidden></p>
+            </div>
+          </div>
+
+          <!-- 2. Export Bar Chart Card -->
+          <div class="card chart-card">
+            <div class="card-title-row">
+              <div>
+                <h3 class="card-title">🚚 <span id="chartExportBarTitle" data-i18n="chartExportTrackingTitle">ஏற்றுமதி கண்காணிப்பு</span></h3>
+                <p class="section-subtitle" style="margin: 4px 0 0;" data-i18n="chartExportTrackingSub">முந்தைய ஏற்றுமதி போக்கு & பகுப்பாய்வு</p>
+              </div>
+              <div class="chart-filter-group" id="dashExportChartFilterGroup">
+                <button type="button" class="chart-filter-btn active" id="dashExportFilterDay" onclick="switchDashboardBarChartFilter('export', 'day')">📅 <span data-i18n="chartDayFilter">நாள்</span></button>
+                <button type="button" class="chart-filter-btn" id="dashExportFilterWeek" onclick="switchDashboardBarChartFilter('export', 'week')">📆 <span data-i18n="chartWeekFilter">வாரம்</span></button>
+                <button type="button" class="chart-filter-btn" id="dashExportFilterMonth" onclick="switchDashboardBarChartFilter('export', 'month')">🗓️ <span data-i18n="chartMonthFilter">மாதம்</span></button>
+              </div>
+            </div>
+            <div class="chart-canvas-wrapper" style="height: 280px;">
+              <canvas id="dashChartExportBar"></canvas>
+              <p class="chart-status" id="dashExportChartStatus" hidden></p>
+            </div>
+          </div>
+
+          <!-- 3. Profit Bar Chart Card -->
+          <div class="card chart-card">
+            <div class="card-title-row">
+              <div>
+                <h3 class="card-title">💰 <span id="chartProfitBarTitle" data-i18n="chartProfitTrackingTitle">நிதி & லாப கண்காணிப்பு</span></h3>
+                <p class="section-subtitle" style="margin: 4px 0 0;" data-i18n="chartProfitTrackingSub">Rate vs சம்பளம் vs செலவுகள் vs நிகர லாபம்</p>
+              </div>
+              <div class="chart-filter-group" id="dashProfitChartFilterGroup">
+                <button type="button" class="chart-filter-btn active" id="dashProfitFilterDay" onclick="switchDashboardBarChartFilter('profit', 'day')">📅 <span data-i18n="chartDayFilter">நாள்</span></button>
+                <button type="button" class="chart-filter-btn" id="dashProfitFilterWeek" onclick="switchDashboardBarChartFilter('profit', 'week')">📆 <span data-i18n="chartWeekFilter">வாரம்</span></button>
+                <button type="button" class="chart-filter-btn" id="dashProfitFilterMonth" onclick="switchDashboardBarChartFilter('profit', 'month')">🗓️ <span data-i18n="chartMonthFilter">மாதம்</span></button>
+              </div>
+            </div>
+            <div class="chart-canvas-wrapper" style="height: 280px;">
+              <canvas id="dashChartProfitBar"></canvas>
+              <p class="chart-status" id="dashProfitChartStatus" hidden></p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Period Breakdown Summary Table -->
+        <div class="card">
+          <div class="card-title-row">
+            <h3 class="card-title">📋 <span id="dashTableTitle" data-i18n="dashBreakdownTitle">காலக்கட்ட சுருக்க அறிக்கை</span></h3>
+            <button class="btn-secondary" onclick="exportDashboardPeriodCSV()" style="min-height: 36px; padding: 6px 14px; font-size: 13px;">
+              <span>📥</span> <span data-i18n="exportCSVBtn">CSV பதிவிறக்கம்</span>
+            </button>
+          </div>
+          <p class="section-subtitle" style="margin-bottom: 12px;" data-i18n="dashBreakdownSub">
+            தேதி வாரியான உற்பத்தி, Rate, கூலி, செலவு மற்றும் லாப நிலவரம்
+          </p>
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th data-i18n="colDate">தேதி</th>
+                  <th data-i18n="colBoxes">கட்டை (Boxes)</th>
+                  <th data-i18n="colCuts">கட்டுகள்</th>
+                  <th data-i18n="colBeedis">பீடிகள்</th>
+                  <th data-i18n="colTobacco">Tobacco</th>
+                  <th data-i18n="colPowder">தூள்</th>
+                  <th data-i18n="colSalary">சம்பளம்</th>
+                  <th data-i18n="colRate">Rate</th>
+                  <th data-i18n="colExpenses">செலவுகள்</th>
+                  <th data-i18n="colProfit">லாபம்</th>
+                </tr>
+              </thead>
+              <tbody id="dashSummaryTableBody">
+                <tr><td colspan="10" style="text-align:center;" data-i18n="loading">ஏற்றப்படுகிறது...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Stock Summary Card -->
+        <div class="card">
+          <div class="card-title-row">
+            <h3 class="card-title">📦 <span data-i18n="stockTitle">தற்போதைய இருப்பு (Stock)</span></h3>
+            <a class="btn-secondary" href="/stock" data-i18n="detailsBtn">விவரம்</a>
+          </div>
+          <div class="metrics-grid">
+            <div class="metric-card">
+              <span class="metric-label" data-i18n="tobaccoStock">Tobacco கையிருப்பு</span>
+              <div class="metric-value" id="dashStockTobacco">0.0 <span class="metric-unit">kg</span></div>
+              <div class="metric-sub" id="dashStockTobaccoConsumed">இன்று பயன்பாடு: 0.0 kg</div>
+            </div>
+            <div class="metric-card">
+              <span class="metric-label" data-i18n="powderStock">தூள் கையிருப்பு</span>
+              <div class="metric-value" id="dashStockPowder">0.0 <span class="metric-unit">kg</span></div>
+              <div class="metric-sub" id="dashStockPowderConsumed">இன்று பயன்பாடு: 0.0 kg</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Weekly Overview Card -->
+        <div class="card" id="dashWeeklyOverviewCard">
+          <div class="card-title-row">
+            <div>
+              <h3 class="card-title">📆 <span data-i18n="weeklyOverviewTitle">இந்த வார நிலவரம் (Weekly Wise Overview)</span></h3>
+              <p class="section-subtitle" data-i18n="weeklyOverviewSub" style="margin-top: 4px; margin-bottom: 0;">கடந்த 7 நாட்கள் vs முந்தைய 7 நாட்கள் ஒப்பீடு</p>
+            </div>
+            <button class="btn-secondary" onclick="setDashboardPeriod('week')">
+              <span>📆</span> <span data-i18n="viewWeeklyDetails">வாராந்திர விவரம்</span>
+            </button>
+          </div>
+          <div class="metrics-grid">
+            <div class="metric-card">
+              <div class="metric-card-top">
+                <span class="metric-label" id="dashWeekProdLabel" data-i18n="weekBoxes">இந்த வார கட்டை (Boxes)</span>
+                <span class="dash-metric-compare" id="dashWeekCutsGrowth">+0</span>
+              </div>
+              <div class="metric-value" id="dashWeekCuts">0 <span class="metric-unit" data-i18n="unitBoxes">Boxes</span></div>
+              <div class="metric-sub" id="dashWeekBeedis">0 பீடிகள் (0 Cuts)</div>
+            </div>
+            <div class="metric-card highlight-rate">
+              <span class="metric-label" data-i18n="weekRate">வார Rate மதிப்பு</span>
+              <div class="metric-value" id="dashWeekRate">₹0</div>
+            </div>
+            <div class="metric-card">
+              <span class="metric-label" data-i18n="weekSalary">வார சம்பளம்</span>
+              <div class="metric-value" id="dashWeekSalary">₹0</div>
+            </div>
+            <div class="metric-card">
+              <span class="metric-label" data-i18n="weekExpenses">வார செலவுகள்</span>
+              <div class="metric-value" id="dashWeekExpenses">₹0</div>
+            </div>
+            <div class="metric-card highlight-profit">
+              <div class="metric-card-top">
+                <span class="metric-label" data-i18n="weekProfit">வார நிகர லாபம்</span>
+                <span class="dash-metric-compare" id="dashWeekProfitGrowth">+₹0</span>
+              </div>
+              <div class="metric-value" id="dashWeekProfit">₹0</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Monthly Overview Card -->
+        <div class="card" id="dashMonthlyOverviewCard">
+          <div class="card-title-row">
+            <div>
+              <h3 class="card-title">📊 <span data-i18n="monthlyOverviewTitle">இந்த மாத நிலவரம் (Monthly Wise Overview)</span></h3>
+              <p class="section-subtitle" data-i18n="monthlyOverviewSub" style="margin-top: 4px; margin-bottom: 0;">நடப்பு மாதம் vs முந்தைய மாதம் ஒப்பீடு</p>
+            </div>
+            <button class="btn-secondary" onclick="setDashboardPeriod('month')">
+              <span>📊</span> <span data-i18n="viewMonthlyDetails">மாதாந்திர விவரம்</span>
+            </button>
+          </div>
+          <div class="metrics-grid">
+            <div class="metric-card">
+              <div class="metric-card-top">
+                <span class="metric-label" id="dashMonthProdLabel" data-i18n="monthBoxes">இந்த மாத கட்டை (Boxes)</span>
+                <span class="dash-metric-compare" id="dashMonthCutsGrowth">+0</span>
+              </div>
+              <div class="metric-value" id="dashMonthCuts">0 <span class="metric-unit" data-i18n="unitBoxes">Boxes</span></div>
+              <div class="metric-sub" id="dashMonthBeedis">0 பீடிகள் (0 Cuts)</div>
+            </div>
+            <div class="metric-card highlight-rate">
+              <span class="metric-label" data-i18n="monthRate">மாத Rate மதிப்பு</span>
+              <div class="metric-value" id="dashMonthRate">₹0</div>
+            </div>
+            <div class="metric-card">
+              <span class="metric-label" data-i18n="monthSalary">மாத சம்பளம்</span>
+              <div class="metric-value" id="dashMonthSalary">₹0</div>
+            </div>
+            <div class="metric-card">
+              <span class="metric-label" data-i18n="monthExpenses">மாத செலவுகள்</span>
+              <div class="metric-value" id="dashMonthExpenses">₹0</div>
+            </div>
+            <div class="metric-card highlight-profit">
+              <div class="metric-card-top">
+                <span class="metric-label" data-i18n="monthProfit">மாத நிகர லாபம்</span>
+                <span class="dash-metric-compare" id="dashMonthProfitGrowth">+₹0</span>
+              </div>
+              <div class="metric-value" id="dashMonthProfit">₹0</div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Bottom Navigation Bar for Mobile Viewports -->
+    <nav class="bottom-nav">
+      <a href="/dashboard" class="nav-item active">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        <span data-i18n="navDashboard">முகப்பு</span>
+      </a>
+      <a href="/production" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M2 20h20M7 20V10l5 3V4l7 5v11"/></svg>
+        <span data-i18n="navProduction">உற்பத்தி</span>
+      </a>
+      <a href="/stock" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+        <span data-i18n="navStock">இருப்பு</span>
+      </a>
+      <a href="/expenses" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        <span data-i18n="navExpenses">செலவுகள்</span>
+      </a>
+      <a href="/export" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>
+        <span data-i18n="navExport">ஏற்றுமதி</span>
+      </a>
+      <a href="/chat" class="nav-item chat-tab">
+        <span class="chat-pulse-badge"></span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        <span data-i18n="navChat">AI சாட்</span>
+      </a>
+      <a href="/settings" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        <span data-i18n="navSettings">அமைப்புகள்</span>
+      </a>
+    </nav>
+
+  </div>
+
+  <!-- Scripts -->
+  <script src="/js/chart.umd.min.js"></script>
+  <script src="/js/i18n.js"></script>
+  <script src="/js/common.js"></script>
+  <script src="/js/dashboard.js"></script>
+</body>
+</html>

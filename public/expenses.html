@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="ta">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>TVS பீடி கம்பெனி - செலவுகள் | Expenses</title>
+  <meta name="description" content="TVS Beedi Company - Daily business expenses tracking and history ledger.">
+  <link rel="icon" type="image/png" href="/images/logo.png">
+  <link rel="apple-touch-icon" href="/images/logo.png">
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Mukta+Malar:wght@400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Stylesheets -->
+  <link rel="stylesheet" href="/css/common.css">
+  <link rel="stylesheet" href="/css/expenses.css">
+</head>
+<body>
+  <div class="app-container">
+    
+    <!-- Top App Header -->
+    <header class="app-header">
+      <div class="brand-wrapper">
+        <div class="brand-logo-wrap">
+          <img src="/images/logo.png" alt="TVS Beedi Logo" class="brand-logo-img">
+        </div>
+        <div class="brand-text">
+          <h1 data-i18n="companyName">TVS பீடி கம்பெனி</h1>
+          <p><span class="status-dot"></span> <span data-i18n="companyTagline">உள் நிர்வாக தளம்</span></p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button id="themeToggleBtn" class="lang-btn" onclick="toggleTheme()" title="Theme">🌙 இரவு</button>
+        <div id="langSwitcher" class="lang-switcher-pill" onclick="toggleLanguage()" role="button" aria-label="Switch Language" title="Switch Language / மொழியை மாற்ற">
+          <span id="langChipTa" class="lang-segment active">தமிழ்</span>
+          <span id="langChipEn" class="lang-segment">EN</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Toast Container -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <!-- Main Content: Expenses -->
+    <main class="main-content">
+      <section id="view-expenses" class="tab-view active">
+        <div class="section-title-wrap">
+          <h2 class="section-title">💸 <span data-i18n="expensesTitle">செலவு பதிவு</span></h2>
+          <p class="section-subtitle" data-i18n="expensesSub">தொழிலாளர் செலவுகள், நிர்வாகம் & அன்றாட செலவு கணக்குகள்</p>
+        </div>
+
+        <!-- Expense Form Card -->
+        <div class="card">
+          <form id="expenseForm" onsubmit="handleExpenseSubmit(event)">
+            <input type="hidden" id="expCategory" value="கூலி / சம்பளம்">
+
+            <!-- Category Pills -->
+            <label class="form-label" data-i18n="selectCategoryLabel">செலவு வகை (Category)</label>
+            <div class="category-pills">
+              <button type="button" class="cat-pill active" onclick="selectExpenseCat(this, 'கூலி / சம்பளம்')">
+                <span>👥</span> <span data-i18n="catSalary">கூலி / சம்பளம்</span>
+              </button>
+              <button type="button" class="cat-pill" onclick="selectExpenseCat(this, 'டீ & உணவு')">
+                <span>☕</span> <span data-i18n="catTea">டீ & உணவு</span>
+              </button>
+              <button type="button" class="cat-pill" onclick="selectExpenseCat(this, 'மின்சாரம்')">
+                <span>⚡</span> <span data-i18n="catCurrent">மின்சாரம்</span>
+              </button>
+              <button type="button" class="cat-pill" onclick="selectExpenseCat(this, 'வண்டி வாடகை')">
+                <span>🚚</span> <span data-i18n="catTransport">வண்டி வாடகை</span>
+              </button>
+              <button type="button" class="cat-pill" onclick="selectExpenseCat(this, 'பராமரிப்பு')">
+                <span>🔧</span> <span data-i18n="catMaintenance">பராமரிப்பு</span>
+              </button>
+              <button type="button" class="cat-pill" onclick="selectExpenseCat(this, 'இதர செலவு')">
+                <span>📝</span> <span data-i18n="catOther">இதர செலவு</span>
+              </button>
+            </div>
+
+            <div class="form-grid">
+              <div class="form-group">
+                <label class="form-label" for="expenseDate" data-i18n="prodDateLabel">தேதி (Date)</label>
+                <input type="date" id="expenseDate" class="form-input" required>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="expAmount" data-i18n="amountLabel">தொகை (₹ Amount)</label>
+                <input type="number" id="expAmount" class="form-input" placeholder="எ.கா: 500" data-i18n-placeholder="amountPlaceholder" min="1" step="1" required>
+              </div>
+            </div>
+
+            <div class="form-grid">
+              <div class="form-group">
+                <label class="form-label" for="expPayment" data-i18n="paymentMethodLabel">பணம் செலுத்திய முறை (Payment Method)</label>
+                <select id="expPayment" class="form-select">
+                  <option value="Cash" data-i18n="payCash">ரொக்கம் (Cash)</option>
+                  <option value="UPI" data-i18n="payUPI">UPI / GPay / PhonePe</option>
+                  <option value="Bank Transfer" data-i18n="payBank">வங்கி பரிவர்த்தனை (Bank)</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="expDesc" data-i18n="descLabel">விவரம் (Description)</label>
+                <input type="text" id="expDesc" class="form-input" placeholder="விருப்பத்தேர்வு (Optional)" data-i18n-placeholder="descPlaceholder">
+              </div>
+            </div>
+
+            <button type="submit" class="btn-primary" style="margin-top: 8px;">
+              <span>💾</span> <span data-i18n="saveExpenseBtn">செலவைச் சேமிக்கவும்</span>
+            </button>
+          </form>
+        </div>
+
+        <!-- Expenses Ledger Card -->
+        <div class="card">
+          <div class="card-title-row">
+            <h3 class="card-title">📜 <span data-i18n="expensesHistoryTitle">செலவு பதிவுகள் வரலாறு</span></h3>
+          </div>
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th data-i18n="colDate">தேதி</th>
+                  <th data-i18n="colCategory">வகை</th>
+                  <th data-i18n="colAmount">தொகை</th>
+                  <th data-i18n="colPaymentMethod">முறை</th>
+                  <th data-i18n="colDescription">விவரம்</th>
+                  <th data-i18n="colActions">செயல்கள்</th>
+                </tr>
+              </thead>
+              <tbody id="expenseTableBody">
+                <tr><td colspan="6" style="text-align:center;" data-i18n="loading">ஏற்றப்படுகிறது...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Bottom Navigation Bar for Mobile Viewports -->
+    <nav class="bottom-nav">
+      <a href="/dashboard" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        <span data-i18n="navDashboard">முகப்பு</span>
+      </a>
+      <a href="/production" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M2 20h20M7 20V10l5 3V4l7 5v11"/></svg>
+        <span data-i18n="navProduction">உற்பத்தி</span>
+      </a>
+      <a href="/stock" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+        <span data-i18n="navStock">இருப்பு</span>
+      </a>
+      <a href="/expenses" class="nav-item active">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        <span data-i18n="navExpenses">செலவுகள்</span>
+      </a>
+      <a href="/export" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>
+        <span data-i18n="navExport">ஏற்றுமதி</span>
+      </a>
+      <a href="/chat" class="nav-item chat-tab">
+        <span class="chat-pulse-badge"></span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        <span data-i18n="navChat">AI சாட்</span>
+      </a>
+      <a href="/settings" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        <span data-i18n="navSettings">அமைப்புகள்</span>
+      </a>
+    </nav>
+
+  </div>
+
+  <!-- Scripts -->
+  <script src="/js/i18n.js"></script>
+  <script src="/js/common.js"></script>
+  <script src="/js/expenses.js"></script>
+</body>
+</html>

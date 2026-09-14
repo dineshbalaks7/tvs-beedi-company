@@ -1,0 +1,427 @@
+/* ===================================================================
+   TVS Beedi Company - Dashboard Specific Stylesheet
+   Period Toggle, Profit Banner, Comparative Growth, Charts & Quick Actions
+   =================================================================== */
+
+/* Profit Transparency Banner */
+.profit-banner {
+  background: linear-gradient(135deg, rgba(217, 119, 6, 0.08) 0%, rgba(5, 150, 105, 0.08) 100%);
+  border: 1px solid rgba(217, 119, 6, 0.2);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  margin-bottom: 20px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+}
+
+[data-theme="dark"] .profit-banner {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.12) 0%, rgba(16, 185, 129, 0.12) 100%);
+  border-color: rgba(245, 158, 11, 0.25);
+}
+
+.profit-formula-display {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 10px;
+  background: var(--bg-card);
+  padding: 12px;
+  border-radius: var(--radius-sm);
+  border: 1px dashed var(--border-color);
+}
+
+.formula-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.formula-title {
+  font-size: 11px;
+  color: var(--text-dim);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  margin-bottom: 2px;
+}
+
+.formula-val {
+  font-family: var(--font-en);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.formula-sign {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--accent-amber);
+}
+
+/* Dashboard Period Switcher (Day-wise / Weekly / Monthly) */
+.dash-period-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.dash-period-pills {
+  display: inline-flex;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  padding: 4px;
+  border-radius: var(--radius-full);
+  gap: 4px;
+}
+
+.dash-period-pill {
+  padding: 6px 14px;
+  border-radius: var(--radius-full);
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  white-space: nowrap;
+}
+
+.dash-period-pill:hover {
+  color: var(--text-main);
+}
+
+.dash-period-pill.active {
+  background: var(--accent-amber);
+  color: #ffffff;
+  box-shadow: 0 2px 8px var(--accent-amber-glow);
+}
+
+.dash-period-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent-green);
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  padding: 4px 12px;
+  border-radius: var(--radius-full);
+}
+
+.pulse-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent-green);
+  animation: pulseGreen 1.8s infinite;
+}
+
+@keyframes pulseGreen {
+  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+  70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+
+/* Quick Action Buttons Row */
+.quick-actions-bar {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+@media (min-width: 640px) {
+  .quick-actions-bar {
+    grid-template-columns: repeat(5, 1fr);
+  }
+}
+
+.quick-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-main);
+  cursor: pointer;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  min-height: 44px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+}
+
+.quick-action-btn:hover {
+  background: var(--accent-amber);
+  color: #ffffff;
+  border-color: var(--accent-amber);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px var(--accent-amber-glow);
+}
+
+/* Executive Period Comparison Card */
+.comparison-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 18px;
+  margin-bottom: 20px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.04);
+}
+
+.comparison-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+  margin-top: 14px;
+}
+
+@media (min-width: 640px) {
+  .comparison-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .comparison-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.comp-item {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 8px;
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.comp-item:hover {
+  transform: translateY(-2px);
+  border-color: var(--accent-amber);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.06);
+}
+
+.comp-item.highlight-gold {
+  border-left: 3px solid var(--accent-gold);
+}
+
+.comp-item.highlight-profit {
+  border-left: 3px solid var(--accent-green);
+}
+
+.comp-item-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.comp-metric-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.comp-growth-pill {
+  font-family: var(--font-en);
+  font-size: 11px;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.comp-growth-pill.up {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.comp-growth-pill.down {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.comp-growth-pill.neutral {
+  background: rgba(148, 163, 184, 0.15);
+  color: #94a3b8;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+}
+
+.comp-values-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  background: rgba(0, 0, 0, 0.03);
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+}
+
+[data-theme="dark"] .comp-values-row {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.comp-col {
+  display: flex;
+  flex-direction: column;
+}
+
+.comp-col-label {
+  font-size: 9.5px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  margin-bottom: 2px;
+}
+
+.comp-val {
+  font-family: var(--font-en);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.comp-val.current {
+  color: var(--text-main);
+}
+
+.comp-val.prev {
+  color: var(--text-muted);
+}
+
+.comp-divider {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-dim);
+  padding: 0 4px;
+}
+
+.comp-delta-text {
+  font-family: var(--font-en);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-align: right;
+}
+
+/* Charts Section Grid */
+.charts-section-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+@media (min-width: 768px) {
+  .charts-section-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .chart-card-wide {
+    grid-column: 1 / -1;
+  }
+}
+
+.chart-card {
+  margin-bottom: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.chart-tag {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: var(--radius-full);
+  background: rgba(245, 158, 11, 0.12);
+  color: var(--accent-gold);
+  border: 1px solid rgba(245, 158, 11, 0.25);
+}
+
+.chart-canvas-wrapper {
+  width: 100%;
+  flex: 1;
+  position: relative;
+}
+
+.chart-status {
+  position: absolute;
+  inset: 50% 16px auto;
+  transform: translateY(-50%);
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+  pointer-events: none;
+}
+
+.dashboard-loading .metrics-grid,
+.dashboard-loading .profit-banner,
+.dashboard-loading .comparison-card,
+.dashboard-loading .charts-section-grid,
+.dashboard-loading > .card {
+  opacity: 0.62;
+  transition: opacity 0.2s ease;
+}
+
+.chart-filter-group {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+@media (max-width: 639px) {
+  .dash-period-pills {
+    width: 100%;
+    overflow-x: auto;
+  }
+
+  .dash-period-pill {
+    flex: 1 0 auto;
+    justify-content: center;
+    padding-inline: 10px;
+  }
+
+  .dash-period-badge {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .chart-card .card-title-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .chart-filter-group {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .chart-card .chart-canvas-wrapper {
+    height: 240px !important;
+  }
+}

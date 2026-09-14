@@ -1,0 +1,193 @@
+/* ===================================================================
+   TVS Beedi Company - Production Specific Stylesheet
+   Live Calculation Chips, Duplicate Date Alert & Edit Mode
+   =================================================================== */
+
+/* Live Calculation Preview Card */
+.calc-preview-card {
+  background: linear-gradient(135deg, rgba(217, 119, 6, 0.08), var(--bg-card));
+  border: 1px solid rgba(217, 119, 6, 0.35);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  margin-bottom: 20px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+}
+
+[data-theme="dark"] .calc-preview-card {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.08), rgba(30, 41, 59, 0.8));
+  border-color: rgba(245, 158, 11, 0.3);
+}
+
+.calc-preview-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--accent-gold);
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.calc-chips-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+@media (min-width: 640px) {
+  .calc-chips-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .calc-chips-grid {
+    grid-template-columns: repeat(6, 1fr);
+  }
+}
+
+.calc-chip {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.calc-chip:hover {
+  transform: translateY(-2px);
+  border-color: var(--accent-amber);
+}
+
+.calc-chip-label {
+  font-size: 11px;
+  color: var(--text-dim);
+  font-weight: 600;
+  margin-bottom: 2px;
+  display: block;
+}
+
+.calc-chip-val {
+  font-family: var(--font-en);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.calc-chip.highlight {
+  border-color: rgba(5, 150, 105, 0.4);
+  background: rgba(5, 150, 105, 0.08);
+}
+
+.calc-chip.highlight-rate {
+  border-color: rgba(217, 119, 6, 0.4);
+  background: rgba(217, 119, 6, 0.08);
+}
+
+.calc-chip.highlight-profit {
+  border-color: rgba(16, 185, 129, 0.45);
+  background: rgba(16, 185, 129, 0.1);
+}
+
+.calc-chip.highlight-profit .calc-chip-val {
+  color: var(--accent-green, #059669);
+  font-weight: 800;
+}
+
+/* Production Duplicate Alert Banner */
+.duplicate-alert-banner {
+  margin-bottom: 18px;
+  padding: 14px 16px;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(217, 119, 6, 0.45);
+  background: rgba(217, 119, 6, 0.12);
+  color: var(--text-main);
+  animation: fadeIn 0.25s ease-out;
+}
+
+[data-theme="dark"] .duplicate-alert-banner {
+  background: rgba(217, 119, 6, 0.2);
+  border-color: rgba(245, 158, 11, 0.45);
+}
+
+.duplicate-alert-content {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.duplicate-alert-info {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  flex: 1;
+  min-width: 240px;
+}
+
+.duplicate-alert-icon {
+  font-size: 22px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.duplicate-alert-title {
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--accent-amber);
+  margin-bottom: 3px;
+}
+
+.duplicate-alert-desc {
+  font-size: 12.5px;
+  color: var(--text-main);
+  line-height: 1.45;
+}
+
+.duplicate-alert-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+/* Edit Mode Indicator */
+.edit-mode-indicator {
+  margin-bottom: 14px;
+  padding: 10px 14px;
+  background: rgba(5, 150, 105, 0.12);
+  border-left: 4px solid var(--accent-green);
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  animation: fadeIn 0.2s ease-out;
+}
+
+[data-theme="dark"] .edit-mode-indicator {
+  background: rgba(16, 185, 129, 0.18);
+}
+
+.edit-mode-indicator-text {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--accent-green);
+}
+
+.table-actions-cell {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.btn-table-action {
+  min-height: 30px;
+  padding: 4px 10px;
+  font-size: 12px;
+  border-radius: var(--radius-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}

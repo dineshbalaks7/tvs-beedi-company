@@ -1,0 +1,27 @@
+/* ===================================================================
+   TVS Beedi Company - Settings Specific Stylesheet
+   Configuration Forms, Ratio Multipliers & Alert Thresholds
+   =================================================================== */
+
+.settings-card {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.settings-section-divider {
+  margin: 20px 0 16px 0;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-color);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--accent-amber);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.settings-note {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-top: 4px;
+}
