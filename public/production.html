@@ -51,6 +51,39 @@
           <p class="section-subtitle" data-i18n="prodSub">கட்டை (Box) எண்ணிக்கை உள்ளிட்டவுடன் தானியங்கி கணக்கீடு செய்யப்படும்</p>
         </div>
 
+        <!-- Production Dashboard Summary -->
+        <section class="production-dashboard" aria-label="Production dashboard">
+          <div class="production-dashboard-header">
+            <div>
+              <h3 class="card-title">📈 Production dashboard</h3>
+              <p class="section-subtitle">Live output, efficiency, and material consumption trends</p>
+            </div>
+            <span class="production-live-badge"><span class="pulse-dot"></span> Live summary</span>
+          </div>
+          <div class="production-kpi-grid">
+            <div class="production-kpi production-kpi-output">
+              <span class="production-kpi-label">Today output</span>
+              <strong id="prodDashTodayBoxes">0 Boxes</strong>
+              <small id="prodDashTodaySub">0 Beedis</small>
+            </div>
+            <div class="production-kpi">
+              <span class="production-kpi-label">Last 7 days</span>
+              <strong id="prodDashWeekBoxes">0 Boxes</strong>
+              <small id="prodDashWeekSub">0 production days</small>
+            </div>
+            <div class="production-kpi">
+              <span class="production-kpi-label">This month</span>
+              <strong id="prodDashMonthBoxes">0 Boxes</strong>
+              <small id="prodDashMonthSub">0 Beedis</small>
+            </div>
+            <div class="production-kpi production-kpi-efficiency">
+              <span class="production-kpi-label">Daily average</span>
+              <strong id="prodDashAverageBoxes">0 Boxes</strong>
+              <small id="prodDashTrend">Waiting for production data</small>
+            </div>
+          </div>
+        </section>
+
         <!-- Production Entry Form -->
         <div class="card">
           <form id="productionForm" onsubmit="handleProductionSubmit(event)">
@@ -171,8 +204,83 @@
           </div>
         </div>
 
-        <!-- Production Records Table Card -->
         <div class="card">
+          <div class="card-title-row">
+            <div>
+              <h3 class="card-title">🧪 Material consumption trend</h3>
+              <p class="section-subtitle" style="margin: 4px 0 0;">Tobacco and powder used per production period</p>
+            </div>
+          </div>
+          <div class="chart-canvas-wrapper" style="height: 290px;">
+            <canvas id="productionConsumptionChart"></canvas>
+            <p class="chart-status" id="productionConsumptionChartStatus" hidden></p>
+          </div>
+        </div>
+
+        <!-- Date Range Filter & Filtered Production Report Card (Placed under Production Tracking) -->
+        <div class="card prod-report-card">
+          <div class="card-title-row">
+            <div>
+              <h3 class="card-title">🗓️ <span data-i18n="prodReportTitle">உற்பத்தி அறிக்கை & வடிகட்டி (Production Report & Filter)</span></h3>
+              <p class="section-subtitle" style="margin-top: 4px; margin-bottom: 0;" data-i18n="prodReportSub">தேதி வரம்பின்படி உற்பத்தி பதிவுகள், மாதவாரியான கூட்டு மற்றும் PDF பதிவிறக்கம்</p>
+            </div>
+            <span class="badge badge-amber" id="prodReportActiveRangeBadge">2026-09</span>
+          </div>
+
+          <div class="prod-report-toolbar">
+            <div class="prod-date-filter-row">
+              <div class="prod-date-item">
+                <label for="prodFilterFromDate" class="prod-filter-label" data-i18n="reportFilterFromLabel">முதல் (From):</label>
+                <input type="date" id="prodFilterFromDate" class="prod-date-input" onchange="onProdDateFilterChange()">
+              </div>
+              <div class="prod-date-item">
+                <label for="prodFilterToDate" class="prod-filter-label" data-i18n="reportFilterToLabel">வரை (To):</label>
+                <input type="date" id="prodFilterToDate" class="prod-date-input" onchange="onProdDateFilterChange()">
+              </div>
+            </div>
+
+            <!-- Date Range Validation Error Alert -->
+            <div id="prodDateValidationError" class="prod-date-validation-msg" role="alert">
+              <span>⚠️</span>
+              <span id="prodDateValidationText" data-i18n="dateOrderError">தொடக்க தேதி முடிவு தேதியை விட அதிகமாக இருக்கக்கூடாது (From Date cannot be later than To Date).</span>
+            </div>
+
+            <div class="prod-presets-row">
+              <div class="prod-report-presets">
+                <button type="button" class="btn-preset active" id="btnProdPresetThisMonth" onclick="setProductionDatePreset('this-month')" data-i18n="presetThisMonth">இந்த மாதம்</button>
+                <button type="button" class="btn-preset" id="btnProdPresetLastMonth" onclick="setProductionDatePreset('last-month')" data-i18n="presetLastMonth">கடந்த மாதம்</button>
+                <button type="button" class="btn-preset" id="btnProdPreset3Months" onclick="setProductionDatePreset('3-months')" data-i18n="presetLast3Months">கடந்த 3 மாதங்கள்</button>
+                <button type="button" class="btn-preset" id="btnProdPresetThisYear" onclick="setProductionDatePreset('this-year')" data-i18n="presetThisYear">இந்த வருடம்</button>
+              </div>
+
+              <div class="prod-report-btn-group">
+                <button type="button" class="btn-pdf-download" id="btnDownloadProdPDF" onclick="downloadProductionPDF()">
+                  <span>📄</span> <span data-i18n="downloadPDFBtn">PDF பதிவிறக்கு</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Filtered Production Records by Month Container -->
+          <div id="prodFilteredRecordsContainer">
+            <!-- Rendered dynamically by JavaScript -->
+          </div>
+
+          <!-- Complete Total Section -->
+          <div id="prodCompleteTotalContainer">
+            <!-- Rendered dynamically by JavaScript -->
+          </div>
+
+          <!-- Bottom PDF Download Button -->
+          <div id="prodBottomActionRow" style="margin-top: 20px; display: flex; justify-content: flex-end;">
+            <button type="button" class="btn-pdf-download" id="btnDownloadProdPDFBottom" onclick="downloadProductionPDF()">
+              <span>📄</span> <span data-i18n="downloadPDFBtn">PDF பதிவிறக்கு</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Production Records History Card (Full Detailed Ledger) -->
+        <div class="card" style="margin-top: 24px;">
           <div class="card-title-row">
             <h3 class="card-title">📜 <span data-i18n="prodHistoryTitle">உற்பத்தி பதிவுகள் வரலாறு</span></h3>
           </div>
@@ -237,6 +345,9 @@
   </div>
 
   <!-- Scripts -->
+  <script src="/js/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="/js/html2pdf.bundle.min.js"></script>
   <script src="/js/chart.umd.min.js"></script>
   <script src="/js/i18n.js"></script>
   <script src="/js/common.js"></script>

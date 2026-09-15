@@ -82,6 +82,11 @@ const SettingsSchema = new mongoose.Schema({
       required: true,
       trim: true
     },
+    role: {
+      type: String,
+      enum: ['admin', 'staff'],
+      default: 'staff'
+    },
     passwordHash: {
       type: String,
       required: true

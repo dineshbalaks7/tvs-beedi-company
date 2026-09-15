@@ -124,6 +124,17 @@ function requireAuth(req, res, next) {
   return res.redirect('/login.html');
 }
 
+function requireAdmin(req, res, next) {
+  const isAdmin = req.session && req.session.authenticated && (
+    req.session.role === 'admin' || req.session.username === ADMIN_USERNAME
+  );
+  if (isAdmin) return next();
+  if (req.originalUrl.startsWith('/api/')) {
+    return res.status(403).json({ error: 'Administrator access required' });
+  }
+  return res.status(403).send('Administrator access required');
+}
+
 app.post('/api/auth/login', async (req, res) => {
   const { username, password } = req.body || {};
   try {
@@ -148,6 +159,7 @@ app.post('/api/auth/login', async (req, res) => {
     }
     req.session.authenticated = true;
     req.session.username = username;
+    req.session.role = username === ADMIN_USERNAME ? 'admin' : (storedUser?.role || 'staff');
     req.session.save((saveErr) => {
       if (saveErr) {
         console.error('Session save error:', saveErr);
@@ -158,6 +170,43 @@ app.post('/api/auth/login', async (req, res) => {
   } catch (error) {
     console.error('Login error:', error);
     return res.status(500).json({ error: 'Unable to sign in', details: error.message });
+  }
+});
+
+app.post('/api/auth/forgot-password', async (req, res) => {
+  const { username, newPassword, confirmPassword } = req.body || {};
+  const normalizedUsername = typeof username === 'string' ? username.trim() : '';
+
+  if (!normalizedUsername) {
+    return res.status(400).json({ error: 'Username is required' });
+  }
+  if (!newPassword || newPassword !== confirmPassword) {
+    return res.status(400).json({ error: 'Password fields are invalid' });
+  }
+  if (newPassword.length < 8) {
+    return res.status(400).json({ error: 'New password must be at least 8 characters' });
+  }
+
+  try {
+    const settings = await Settings.getSettings();
+    const storedUser = (settings.authUsers || []).find(user => user.username === normalizedUsername);
+    const isAdmin = normalizedUsername === ADMIN_USERNAME;
+    if (!storedUser && !isAdmin) {
+      return res.status(404).json({ error: 'Username not found' });
+    }
+
+    const hashed = await hashPassword(newPassword);
+    if (storedUser) {
+      storedUser.passwordHash = hashed.hash;
+      storedUser.passwordSalt = hashed.salt;
+    } else {
+      settings.adminPasswordHash = hashed.hash;
+      settings.adminPasswordSalt = hashed.salt;
+    }
+    await settings.save();
+    return res.json({ updated: true });
+  } catch (error) {
+    return res.status(500).json({ error: 'Unable to reset password', details: error.message });
   }
 });
 
@@ -199,9 +248,14 @@ app.post('/api/auth/change-password', requireAuth, async (req, res) => {
 });
 
 app.use((req, res, next) => {
-  const isPublicHtml = req.path === '/login.html' || req.path === '/login';
+  if (req.path === '/login.html') {
+    const query = req.originalUrl.includes('?') ? req.originalUrl.slice(req.originalUrl.indexOf('?')) : '';
+    return res.redirect(`/login${query}`);
+  }
+
+  const isPublicHtml = req.path === '/login';
   if ((req.path === '/' || req.path.endsWith('.html')) && !isPublicHtml && (!req.session || !req.session.authenticated)) {
-    return res.redirect('/login.html');
+    return res.redirect('/login');
   }
   return next();
 });
@@ -225,7 +279,7 @@ app.get('/settings', requireAuth, (req, res) => res.sendFile(path.join(__dirname
 
 // Branded 404 response for unknown pages and assets
 app.get('*', (req, res) => {
-  if (!req.session || !req.session.authenticated) return res.redirect('/login.html');
+  if (!req.session || !req.session.authenticated) return res.redirect('/login');
   res.status(404).sendFile(path.join(__dirname, 'public', '404.html'));
 });
 
@@ -264,37 +318,23 @@ async function initializeDatabase() {
       console.log('✅ Migrated settings to Boxes (1 Box = 300 cuts = 6,000 beedis, 20 beedis/cut).');
     }
 
-    // 2. Ensure Stock exists (35 kg Tobacco, 35 kg Powder)
+    // 2. Ensure stock documents exist without inventing physical stock.
     let tobaccoStock = await Stock.findOne({ item: 'tobacco' });
     if (!tobaccoStock) {
       tobaccoStock = await Stock.create({
         item: 'tobacco',
-        quantityGrams: 35000 // 35 kg
+        quantityGrams: 0
       });
-      await StockMovement.create({
-        item: 'tobacco',
-        type: 'initial',
-        quantityGrams: 35000,
-        balanceAfterGrams: 35000,
-        notes: 'Initial stock setup: 35 kg'
-      });
-      console.log('✅ Initialized Tobacco stock: 35 kg.');
+      console.log('✅ Initialized Tobacco stock: 0 kg.');
     }
 
     let powderStock = await Stock.findOne({ item: 'powder' });
     if (!powderStock) {
       powderStock = await Stock.create({
         item: 'powder',
-        quantityGrams: 35000 // 35 kg
+        quantityGrams: 0
       });
-      await StockMovement.create({
-        item: 'powder',
-        type: 'initial',
-        quantityGrams: 35000,
-        balanceAfterGrams: 35000,
-        notes: 'Initial stock setup: 35 kg'
-      });
-      console.log('✅ Initialized Tobacco Powder stock: 35 kg.');
+      console.log('✅ Initialized Tobacco Powder stock: 0 kg.');
     }
 
     // 3. Seed initial starter production & expenses if database is clean

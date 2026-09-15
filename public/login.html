@@ -43,6 +43,25 @@
         </div>
         <p id="loginError" class="login-error" role="alert" hidden></p>
         <button id="loginButton" type="submit" class="login-submit-btn">Sign in</button>
+        <button id="forgotPasswordLink" type="button" class="login-link-btn">Forgot password?</button>
+      </form>
+      <form id="forgotPasswordForm" hidden>
+        <div class="login-heading forgot-heading">
+          <p class="login-eyebrow">ACCOUNT RECOVERY</p>
+          <h1>Reset password</h1>
+          <p>Enter your username, then choose a new password.</p>
+        </div>
+        <label for="forgotUsername">Username</label>
+        <input id="forgotUsername" name="username" type="text" autocomplete="username" required>
+        <div id="newPasswordFields" hidden>
+          <label for="newPassword">New password</label>
+          <input id="newPassword" name="newPassword" type="password" minlength="8" autocomplete="new-password" required>
+          <label for="confirmNewPassword">Confirm new password</label>
+          <input id="confirmNewPassword" name="confirmPassword" type="password" minlength="8" autocomplete="new-password" required>
+        </div>
+        <p id="forgotError" class="login-error" role="alert" hidden></p>
+        <button id="forgotPasswordButton" type="submit" class="login-submit-btn">Continue</button>
+        <button id="backToLoginButton" type="button" class="login-link-btn">Back to sign in</button>
       </form>
     </section>
   </main>
@@ -52,11 +71,17 @@
     const error = document.getElementById('loginError');
     const togglePasswordBtn = document.getElementById('togglePasswordBtn');
     const passwordInput = document.getElementById('password');
+    const forgotPasswordLink = document.getElementById('forgotPasswordLink');
+    const forgotPasswordForm = document.getElementById('forgotPasswordForm');
+    const newPasswordFields = document.getElementById('newPasswordFields');
+    const forgotPasswordButton = document.getElementById('forgotPasswordButton');
+    const forgotError = document.getElementById('forgotError');
+    const backToLoginButton = document.getElementById('backToLoginButton');
 
     if (new URLSearchParams(window.location.search).get('expired') === '1') {
       error.textContent = 'Your session expired due to inactivity. Please sign in again.';
       error.hidden = false;
-      window.history.replaceState({}, document.title, '/login.html');
+      window.history.replaceState({}, document.title, '/login');
     }
 
     if (togglePasswordBtn && passwordInput) {
@@ -101,6 +126,64 @@
         error.hidden = false;
         button.disabled = false;
         button.textContent = 'Sign in';
+      }
+    });
+
+    forgotPasswordLink.addEventListener('click', () => {
+      form.hidden = true;
+      forgotPasswordForm.hidden = false;
+      forgotError.hidden = true;
+      document.getElementById('forgotUsername').focus();
+    });
+
+    backToLoginButton.addEventListener('click', () => {
+      forgotPasswordForm.reset();
+      newPasswordFields.hidden = true;
+      forgotPasswordButton.textContent = 'Continue';
+      form.hidden = false;
+      forgotPasswordForm.hidden = true;
+      document.getElementById('username').focus();
+    });
+
+    forgotPasswordForm.addEventListener('submit', async event => {
+      event.preventDefault();
+      forgotError.hidden = true;
+
+      if (newPasswordFields.hidden) {
+        const username = document.getElementById('forgotUsername').value.trim();
+        if (!username) return;
+        newPasswordFields.hidden = false;
+        forgotPasswordButton.textContent = 'Reset password';
+        document.getElementById('newPassword').focus();
+        return;
+      }
+
+      forgotPasswordButton.disabled = true;
+      forgotPasswordButton.textContent = 'Resetting...';
+      try {
+        const response = await fetch('/api/auth/forgot-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            username: document.getElementById('forgotUsername').value.trim(),
+            newPassword: document.getElementById('newPassword').value,
+            confirmPassword: document.getElementById('confirmNewPassword').value
+          })
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.error || 'Unable to reset password');
+        forgotPasswordForm.reset();
+        newPasswordFields.hidden = true;
+        forgotPasswordButton.disabled = false;
+        forgotPasswordButton.textContent = 'Continue';
+        forgotError.classList.add('login-success');
+        forgotError.textContent = 'Password reset successfully. Please sign in with your new password.';
+        forgotError.hidden = false;
+      } catch (err) {
+        forgotError.textContent = err.message;
+        forgotError.hidden = false;
+        forgotPasswordButton.disabled = false;
+        forgotPasswordButton.textContent = 'Reset password';
       }
     });
   </script>

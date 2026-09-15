@@ -59,9 +59,9 @@ window.fetch = async function(...args) {
   try {
     const response = await nativeFetch(...args);
     // Handle session expiration
-    if (response.status === 401 && !redirectingToLogin && window.location.pathname !== '/login.html') {
+    if (response.status === 401 && !redirectingToLogin && window.location.pathname !== '/login') {
       redirectingToLogin = true;
-      window.location.replace('/login.html?expired=1');
+      window.location.replace('/login?expired=1');
     }
     return response;
   } finally {
@@ -104,7 +104,7 @@ async function logout() {
   try {
     await fetch('/api/auth/logout', { method: 'POST' });
   } finally {
-    window.location.href = '/login.html';
+    window.location.href = '/login';
   }
 }
 

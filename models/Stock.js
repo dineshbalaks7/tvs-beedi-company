@@ -10,7 +10,7 @@ const StockSchema = new mongoose.Schema({
   quantityGrams: {
     type: Number,
     required: true,
-    default: 35000 // default 35 kg = 35,000 g
+    default: 0
   },
   lastUpdated: {
     type: Date,
@@ -22,7 +22,7 @@ const StockSchema = new mongoose.Schema({
 StockSchema.statics.getStock = async function(item) {
   let stock = await this.findOne({ item });
   if (!stock) {
-    stock = await this.create({ item, quantityGrams: 35000 });
+    stock = await this.create({ item, quantityGrams: 0 });
   }
   return stock;
 };

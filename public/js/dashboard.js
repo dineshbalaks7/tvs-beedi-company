@@ -4,6 +4,7 @@
  */
 
 let currentDashboardPeriod = 'day';
+let currentComparisonPeriod = 'day';
 let cachedAnalytics = null;
 let dashProdChartInstance = null;
 let dashExportChartInstance = null;
@@ -34,8 +35,29 @@ function getWeekBucket(value) {
 function setDashboardPeriod(period) {
   if (period !== 'day' && period !== 'week' && period !== 'month') return;
   currentDashboardPeriod = period;
+  currentComparisonPeriod = period;
   updateDashboardPeriodPills();
+  updateComparisonFilterButtons();
   loadDashboardAnalytics(period);
+}
+
+function setComparisonPeriod(period) {
+  if (period !== 'day' && period !== 'week' && period !== 'month') return;
+  currentComparisonPeriod = period;
+  updateComparisonFilterButtons();
+  if (cachedAnalytics) {
+    renderPeriodComparisonCard(cachedAnalytics, currentComparisonPeriod);
+  }
+}
+
+function updateComparisonFilterButtons() {
+  const btnDay = document.getElementById('compFilterDay');
+  const btnWeek = document.getElementById('compFilterWeek');
+  const btnMonth = document.getElementById('compFilterMonth');
+  [btnDay, btnWeek, btnMonth].forEach(b => b && b.classList.remove('active'));
+  if (currentComparisonPeriod === 'day' && btnDay) btnDay.classList.add('active');
+  if (currentComparisonPeriod === 'week' && btnWeek) btnWeek.classList.add('active');
+  if (currentComparisonPeriod === 'month' && btnMonth) btnMonth.classList.add('active');
 }
 
 function setDashboardLoading(isLoading) {
@@ -176,34 +198,6 @@ function renderDashboardUI(data) {
   }
 
   // 3. Comparative Growth Formatting in Numbers
-  function formatDeltaDisplay(deltaVal, type = 'number', unit = '', isInverse = false) {
-    if (deltaVal === undefined || deltaVal === null || isNaN(Number(deltaVal))) {
-      return { text: '—', cls: 'neutral', num: 0 };
-    }
-    const num = Number(deltaVal);
-    let cls = 'neutral';
-    let sign = '';
-
-    if (num > 0) {
-      sign = '+';
-      cls = isInverse ? 'down' : 'up';
-    } else if (num < 0) {
-      cls = isInverse ? 'up' : 'down';
-    }
-
-    let valStr = '';
-    if (type === 'currency') {
-      valStr = (num < 0 ? '-₹' : sign + '₹') + Math.abs(num).toLocaleString('en-IN');
-    } else if (type === 'weight') {
-      valStr = `${sign}${num.toFixed(1)} ${unit}`.trim();
-    } else {
-      valStr = `${sign}${Math.round(num).toLocaleString('en-IN')} ${unit}`.trim();
-    }
-
-    return { text: valStr, cls, num };
-  }
-
-  // Update Main Metrics Growth Badges
   if (data.comparison && data.comparison.growth) {
     const comp = data.comparison;
     const g = comp.growth;
@@ -218,57 +212,28 @@ function renderDashboardUI(data) {
       el.setAttribute('title', `${d.text} vs ${periodLabel}`);
     };
 
-    setBadge('compareBadgeBoxes', g.deltaBoxes, 'number', isEn ? 'Boxes' : 'கட்டை');
-    setBadge('compareBadgeBeedis', g.deltaBeedis, 'number', 'Pcs');
-    setBadge('compareBadgeTobacco', g.deltaTobacco, 'weight', 'kg', true);
-    setBadge('compareBadgePowder', g.deltaPowder, 'weight', 'kg', true);
-    setBadge('compareBadgeRate', g.deltaRate, 'currency');
-    setBadge('compareBadgeSalary', g.deltaSalary, 'currency');
-    setBadge('compareBadgeExpenses', g.deltaExpenses, 'currency', '', true);
-    setBadge('compareBadgeProfit', g.deltaProfit, 'currency');
+    const deltaBoxes = g.deltaBoxes !== undefined ? g.deltaBoxes : g.boxesDelta;
+    const deltaBeedis = g.deltaBeedis !== undefined ? g.deltaBeedis : g.beedisDelta;
+    const deltaTobacco = g.deltaTobacco !== undefined ? g.deltaTobacco : g.tobaccoDelta;
+    const deltaPowder = g.deltaPowder !== undefined ? g.deltaPowder : g.powderDelta;
+    const deltaRate = g.deltaRate !== undefined ? g.deltaRate : g.rateDelta;
+    const deltaSalary = g.deltaSalary !== undefined ? g.deltaSalary : g.salaryDelta;
+    const deltaExpenses = g.deltaExpenses !== undefined ? g.deltaExpenses : g.expensesDelta;
+    const deltaProfit = g.deltaProfit !== undefined ? g.deltaProfit : g.profitDelta;
 
-    // Period Comparison Card
-    const compTag = document.getElementById('comparisonPeriodTag');
-    if (compTag) compTag.textContent = isEn ? comp.labelEn : comp.labelTa;
-
-    const updateCompItem = (prefix, curVal, prevVal, deltaVal, type = 'number', unit = '', isInverse = false) => {
-      const elCur = document.getElementById(`compCur${prefix}`);
-      const elPrev = document.getElementById(`compPrev${prefix}`);
-      const elGrowth = document.getElementById(`compGrowth${prefix}`);
-      const elDelta = document.getElementById(`compDelta${prefix}`);
-
-      let curStr = '', prevStr = '';
-      if (type === 'currency') {
-        curStr = `₹${Math.round(curVal).toLocaleString('en-IN')}`;
-        prevStr = `₹${Math.round(prevVal).toLocaleString('en-IN')}`;
-      } else if (type === 'weight') {
-        curStr = `${Number(curVal).toFixed(1)} ${unit}`;
-        prevStr = `${Number(prevVal).toFixed(1)} ${unit}`;
-      } else {
-        curStr = `${Math.round(curVal).toLocaleString('en-IN')} ${unit}`.trim();
-        prevStr = `${Math.round(prevVal).toLocaleString('en-IN')} ${unit}`.trim();
-      }
-
-      if (elCur) elCur.textContent = curStr;
-      if (elPrev) elPrev.textContent = prevStr;
-
-      const d = formatDeltaDisplay(deltaVal, type, unit, isInverse);
-      if (elGrowth) {
-        elGrowth.className = `comp-growth-pill ${d.cls}`;
-        elGrowth.textContent = d.text;
-      }
-      if (elDelta) {
-        elDelta.textContent = `Δ ${d.text}`;
-      }
-    };
-
-    updateCompItem('Boxes', comp.current.boxes, comp.previous.boxes, g.deltaBoxes, 'number', isEn ? 'Boxes' : 'கட்டை');
-    updateCompItem('Beedis', comp.current.beedis, comp.previous.beedis, g.deltaBeedis, 'number', 'Pcs');
-    updateCompItem('Rate', comp.current.rate, comp.previous.rate, g.deltaRate, 'currency');
-    updateCompItem('Salary', comp.current.salary, comp.previous.salary, g.deltaSalary, 'currency');
-    updateCompItem('Expenses', comp.current.expenses, comp.previous.expenses, g.deltaExpenses, 'currency', '', true);
-    updateCompItem('Profit', comp.current.profit, comp.previous.profit, g.deltaProfit, 'currency');
+    setBadge('compareBadgeBoxes', deltaBoxes, 'number', isEn ? 'Boxes' : 'கட்டை');
+    setBadge('compareBadgeBeedis', deltaBeedis, 'number', 'Pcs');
+    setBadge('compareBadgeTobacco', deltaTobacco, 'weight', 'kg', true);
+    setBadge('compareBadgePowder', deltaPowder, 'weight', 'kg', true);
+    setBadge('compareBadgeRate', deltaRate, 'currency');
+    setBadge('compareBadgeSalary', deltaSalary, 'currency');
+    setBadge('compareBadgeExpenses', deltaExpenses, 'currency', '', true);
+    setBadge('compareBadgeProfit', deltaProfit, 'currency');
   }
+
+  // Render Period Comparison & Growth Analytics Card
+  updateComparisonFilterButtons();
+  renderPeriodComparisonCard(data, currentComparisonPeriod);
 
   // 4. Stock Summary in Dashboard
   if (data.stock) {
@@ -383,6 +348,136 @@ function renderDashboardUI(data) {
       `).join('');
     }
   }
+}
+
+// 3. Comparative Growth Formatting in Numbers
+function formatDeltaDisplay(deltaVal, type = 'number', unit = '', isInverse = false) {
+  if (deltaVal === undefined || deltaVal === null || isNaN(Number(deltaVal))) {
+    return { text: '—', cls: 'neutral', num: 0 };
+  }
+  const num = Number(deltaVal);
+  let cls = 'neutral';
+  let sign = '';
+
+  if (num > 0) {
+    sign = '+';
+    cls = isInverse ? 'down' : 'up';
+  } else if (num < 0) {
+    sign = '';
+    cls = isInverse ? 'up' : 'down';
+  }
+
+  let valStr = '';
+  if (type === 'currency') {
+    valStr = (num < 0 ? '-₹' : sign + '₹') + Math.abs(Math.round(num)).toLocaleString('en-IN');
+  } else if (type === 'weight') {
+    valStr = `${sign}${num.toFixed(1)} ${unit}`.trim();
+  } else {
+    valStr = `${sign}${Math.round(num).toLocaleString('en-IN')} ${unit}`.trim();
+  }
+
+  return { text: valStr, cls, num };
+}
+
+function updateCompItem(prefix, curVal, prevVal, deltaVal, type = 'number', unit = '', isInverse = false) {
+  const elCur = document.getElementById(`compCur${prefix}`);
+  const elPrev = document.getElementById(`compPrev${prefix}`);
+  const elGrowth = document.getElementById(`compGrowth${prefix}`);
+  const elDelta = document.getElementById(`compDelta${prefix}`);
+
+  let curStr = '', prevStr = '';
+  if (type === 'currency') {
+    curStr = `₹${Math.round(curVal || 0).toLocaleString('en-IN')}`;
+    prevStr = `₹${Math.round(prevVal || 0).toLocaleString('en-IN')}`;
+  } else if (type === 'weight') {
+    curStr = `${Number(curVal || 0).toFixed(1)} ${unit}`;
+    prevStr = `${Number(prevVal || 0).toFixed(1)} ${unit}`;
+  } else {
+    curStr = `${Math.round(curVal || 0).toLocaleString('en-IN')} ${unit}`.trim();
+    prevStr = `${Math.round(prevVal || 0).toLocaleString('en-IN')} ${unit}`.trim();
+  }
+
+  if (elCur) elCur.textContent = curStr;
+  if (elPrev) elPrev.textContent = prevStr;
+
+  const d = formatDeltaDisplay(deltaVal, type, unit, isInverse);
+  if (elGrowth) {
+    elGrowth.className = `comp-growth-pill ${d.cls}`;
+    elGrowth.textContent = d.text;
+  }
+  if (elDelta) {
+    elDelta.textContent = `Δ ${d.text}`;
+  }
+}
+
+function renderPeriodComparisonCard(data, period = currentComparisonPeriod) {
+  if (!data) return;
+  const isEn = (typeof currentLanguage !== 'undefined' && currentLanguage === 'en');
+
+  let comp = null;
+  if (period === 'day') {
+    comp = data.dayComparison || (data.period === 'day' ? data.comparison : null);
+  } else if (period === 'month') {
+    comp = data.monthComparison || (data.period === 'month' ? data.comparison : null);
+  } else {
+    comp = data.weekComparison || (data.period === 'week' ? data.comparison : null);
+  }
+
+  if (!comp) comp = data.comparison;
+  if (!comp || !comp.growth || !comp.current || !comp.previous) return;
+
+  const g = comp.growth;
+
+  const compTag = document.getElementById('comparisonPeriodTag');
+  const subTitle = document.getElementById('comparisonSubtitle');
+
+  if (period === 'day') {
+    if (compTag) compTag.textContent = isEn ? 'Today vs Yesterday' : 'இன்று vs நேற்று';
+    if (subTitle) subTitle.textContent = isEn
+      ? 'Direct benchmark comparison against yesterday'
+      : 'இன்றைய தினத்திற்கும் நேற்றைய தினத்திற்கும் நேரடி ஒப்பீடு (Today vs Yesterday Direct Comparison)';
+  } else if (period === 'month') {
+    if (compTag) compTag.textContent = isEn ? 'This Month vs Previous Month' : 'இந்த மாதம் vs கடந்த மாதம்';
+    if (subTitle) subTitle.textContent = isEn
+      ? 'Direct benchmark comparison against the previous month'
+      : 'இந்த மாதத்திற்கும் கடந்த மாதத்திற்கும் நேரடி ஒப்பீடு (This Month vs Previous Month Direct Comparison)';
+  } else {
+    if (compTag) compTag.textContent = isEn ? 'This Week vs Previous Week' : 'இந்த வாரம் vs கடந்த வாரம்';
+    if (subTitle) subTitle.textContent = isEn
+      ? 'Direct benchmark comparison against the previous week'
+      : 'இந்த வாரத்திற்கும் கடந்த வாரத்திற்கும் நேரடி ஒப்பீடு (This Week vs Previous Week Direct Comparison)';
+  }
+
+  let curColText = isEn ? 'Today' : 'இன்று (Today)';
+  let prevColText = isEn ? 'Yesterday' : 'நேற்று (Yesterday)';
+  if (period === 'week') {
+    curColText = isEn ? 'This Week' : 'இந்த வாரம் (This Week)';
+    prevColText = isEn ? 'Last Week' : 'கடந்த வாரம் (Last Week)';
+  } else if (period === 'month') {
+    curColText = isEn ? 'This Month' : 'இந்த மாதம் (This Month)';
+    prevColText = isEn ? 'Last Month' : 'கடந்த மாதம் (Last Month)';
+  }
+
+  document.querySelectorAll('.comp-label-current').forEach(el => {
+    el.textContent = curColText;
+  });
+  document.querySelectorAll('.comp-label-previous').forEach(el => {
+    el.textContent = prevColText;
+  });
+
+  const deltaBoxes = g.deltaBoxes !== undefined ? g.deltaBoxes : (g.boxesDelta !== undefined ? g.boxesDelta : Number((comp.current.boxes - comp.previous.boxes).toFixed(1)));
+  const deltaBeedis = g.deltaBeedis !== undefined ? g.deltaBeedis : (g.beedisDelta !== undefined ? g.beedisDelta : (comp.current.beedis - comp.previous.beedis));
+  const deltaRate = g.deltaRate !== undefined ? g.deltaRate : (g.rateDelta !== undefined ? g.rateDelta : (comp.current.rate - comp.previous.rate));
+  const deltaSalary = g.deltaSalary !== undefined ? g.deltaSalary : (g.salaryDelta !== undefined ? g.salaryDelta : (comp.current.salary - comp.previous.salary));
+  const deltaExpenses = g.deltaExpenses !== undefined ? g.deltaExpenses : (g.expensesDelta !== undefined ? g.expensesDelta : (comp.current.expenses - comp.previous.expenses));
+  const deltaProfit = g.deltaProfit !== undefined ? g.deltaProfit : (g.profitDelta !== undefined ? g.profitDelta : (comp.current.profit - comp.previous.profit));
+
+  updateCompItem('Boxes', comp.current.boxes, comp.previous.boxes, deltaBoxes, 'number', isEn ? 'Boxes' : 'கட்டை');
+  updateCompItem('Beedis', comp.current.beedis, comp.previous.beedis, deltaBeedis, 'number', 'Pcs');
+  updateCompItem('Rate', comp.current.rate, comp.previous.rate, deltaRate, 'currency');
+  updateCompItem('Salary', comp.current.salary, comp.previous.salary, deltaSalary, 'currency');
+  updateCompItem('Expenses', comp.current.expenses, comp.previous.expenses, deltaExpenses, 'currency', '', true);
+  updateCompItem('Profit', comp.current.profit, comp.previous.profit, deltaProfit, 'currency');
 }
 
 function switchDashboardBarChartFilter(type, granularity) {

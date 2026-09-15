@@ -242,8 +242,8 @@
               <button type="button" class="btn-secondary" style="min-height: 38px; padding: 6px 14px;" onclick="applyCustomExportDateFilter()" data-i18n="filterBtn">
                 வடிகட்டு
               </button>
-              <button type="button" class="btn-secondary" style="min-height: 38px; padding: 6px 14px;" onclick="exportExportCSV()">
-                <span>📥</span> CSV
+              <button type="button" class="btn-pdf-download" id="btnDownloadExportPDF" style="min-height: 38px; padding: 6px 14px;" onclick="downloadExportPDF()">
+                <span>📄</span> <span data-i18n="downloadPDFBtn">PDF பதிவிறக்கு</span>
               </button>
             </div>
           </div>
@@ -306,6 +306,9 @@
   </div>
 
   <!-- Scripts -->
+  <script src="/js/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="/js/html2pdf.bundle.min.js"></script>
   <script src="/js/chart.umd.min.js"></script>
   <script src="/js/i18n.js"></script>
   <script src="/js/common.js"></script>

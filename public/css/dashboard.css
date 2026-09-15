@@ -183,6 +183,28 @@
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.04);
 }
 
+.comp-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.comp-filter-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 640px) {
+  .comp-filter-wrap {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
+
 .comparison-grid {
   display: grid;
   grid-template-columns: 1fr;

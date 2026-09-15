@@ -34,14 +34,12 @@ function getDateFilter(query) {
   if (query.from || query.to) {
     filter.date = {};
     if (query.from) {
-      const fromDate = new Date(query.from);
-      fromDate.setHours(0, 0, 0, 0);
-      filter.date.$gte = fromDate;
+      const bounds = getDayBounds(query.from);
+      filter.date.$gte = bounds.minStart;
     }
     if (query.to) {
-      const toDate = new Date(query.to);
-      toDate.setHours(23, 59, 59, 999);
-      filter.date.$lte = toDate;
+      const bounds = getDayBounds(query.to);
+      filter.date.$lte = bounds.maxEnd;
     }
   }
   return filter;
@@ -293,20 +291,29 @@ router.get(['/dashboard/analytics', '/analytics/dashboard'], async (req, res) =>
         growth: {
           boxes: calcGrowth(previous.boxes, current.boxes),
           boxesDelta: Number((current.boxes - previous.boxes).toFixed(1)),
+          deltaBoxes: Number((current.boxes - previous.boxes).toFixed(1)),
           cuts: calcGrowth(previous.cuts, current.cuts),
           cutsDelta: current.cuts - previous.cuts,
+          deltaCuts: current.cuts - previous.cuts,
           beedis: calcGrowth(previous.beedis, current.beedis),
           beedisDelta: current.beedis - previous.beedis,
+          deltaBeedis: current.beedis - previous.beedis,
           tobaccoDelta: Number((current.tobaccoUsedKg - previous.tobaccoUsedKg).toFixed(2)),
+          deltaTobacco: Number((current.tobaccoUsedKg - previous.tobaccoUsedKg).toFixed(2)),
           powderDelta: Number((current.powderUsedKg - previous.powderUsedKg).toFixed(2)),
+          deltaPowder: Number((current.powderUsedKg - previous.powderUsedKg).toFixed(2)),
           rate: calcGrowth(previous.rate, current.rate),
           rateDelta: current.rate - previous.rate,
+          deltaRate: current.rate - previous.rate,
           salary: calcGrowth(previous.salary, current.salary),
           salaryDelta: current.salary - previous.salary,
+          deltaSalary: current.salary - previous.salary,
           expenses: calcGrowth(previous.expenses, current.expenses),
           expensesDelta: current.expenses - previous.expenses,
+          deltaExpenses: current.expenses - previous.expenses,
           profit: calcGrowth(previous.profit, current.profit),
-          profitDelta: current.profit - previous.profit
+          profitDelta: current.profit - previous.profit,
+          deltaProfit: current.profit - previous.profit
         }
       };
     }
@@ -702,7 +709,8 @@ router.get('/analytics/history', async (req, res) => {
 router.get('/production', async (req, res) => {
   try {
     const filter = getDateFilter(req.query);
-    const productions = await Production.find(filter).sort({ date: -1, createdAt: -1 }).limit(100);
+    const limit = req.query.limit ? Number(req.query.limit) : ((req.query.from || req.query.to) ? 2000 : 100);
+    const productions = await Production.find(filter).sort({ date: -1, createdAt: -1 }).limit(limit);
     res.json(productions);
   } catch (error) {
     res.status(500).json({ error: error.message });

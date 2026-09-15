@@ -190,14 +190,27 @@
 
         <!-- Executive Period Comparison Breakdown Card -->
         <div class="card comparison-card" id="periodComparisonCard">
-          <div class="card-title-row">
+          <div class="card-title-row comp-title-row">
             <div>
               <h3 class="card-title">⚖️ <span data-i18n="dashComparisonTitle">காலக்கட்ட ஒப்பீடு & வளர்ச்சி பகுப்பாய்வு</span></h3>
               <p class="section-subtitle" id="comparisonSubtitle" data-i18n="dashComparisonSub" style="margin-top: 4px; margin-bottom: 0;">
                 முந்தைய காலக்கட்டத்துடன் நேரடி ஒப்பீடு (Previous Period Comparison)
               </p>
             </div>
-            <span class="chart-tag" id="comparisonPeriodTag">This Week vs Last Week</span>
+            <div class="comp-filter-wrap">
+              <div class="chart-filter-group" id="compCardFilterGroup">
+                <button type="button" class="chart-filter-btn" id="compFilterDay" onclick="setComparisonPeriod('day')" title="Today vs Yesterday">
+                  <span>📅</span> <span data-i18n="compFilterDay">நாள் (நேற்று)</span>
+                </button>
+                <button type="button" class="chart-filter-btn active" id="compFilterWeek" onclick="setComparisonPeriod('week')" title="This Week vs Previous Week">
+                  <span>📆</span> <span data-i18n="compFilterWeek">வாரம் (கடந்த வாரம்)</span>
+                </button>
+                <button type="button" class="chart-filter-btn" id="compFilterMonth" onclick="setComparisonPeriod('month')" title="This Month vs Previous Month">
+                  <span>📊</span> <span data-i18n="compFilterMonth">மாதம் (கடந்த மாதம்)</span>
+                </button>
+              </div>
+              <span class="chart-tag" id="comparisonPeriodTag">This Week vs Last Week</span>
+            </div>
           </div>
 
           <div class="comparison-grid">
@@ -208,12 +221,12 @@
               </div>
               <div class="comp-values-row">
                 <div class="comp-col">
-                  <span class="comp-col-label" data-i18n="currentPeriodTitle">தற்போதைய காலம்</span>
+                  <span class="comp-col-label comp-label-current" data-i18n="currentPeriodTitle">தற்போதைய காலம்</span>
                   <span class="comp-val current" id="compCurBoxes">0 Boxes</span>
                 </div>
                 <div class="comp-divider">vs</div>
                 <div class="comp-col">
-                  <span class="comp-col-label" data-i18n="previousPeriodTitle">முந்தைய காலம்</span>
+                  <span class="comp-col-label comp-label-previous" data-i18n="previousPeriodTitle">முந்தைய காலம்</span>
                   <span class="comp-val prev" id="compPrevBoxes">0 Boxes</span>
                 </div>
               </div>
@@ -227,12 +240,12 @@
               </div>
               <div class="comp-values-row">
                 <div class="comp-col">
-                  <span class="comp-col-label" data-i18n="currentPeriodTitle">தற்போதைய காலம்</span>
+                  <span class="comp-col-label comp-label-current" data-i18n="currentPeriodTitle">தற்போதைய காலம்</span>
                   <span class="comp-val current" id="compCurBeedis">0 Pcs</span>
                 </div>
                 <div class="comp-divider">vs</div>
                 <div class="comp-col">
-                  <span class="comp-col-label" data-i18n="previousPeriodTitle">முந்தைய காலம்</span>
+                  <span class="comp-col-label comp-label-previous" data-i18n="previousPeriodTitle">முந்தைய காலம்</span>
                   <span class="comp-val prev" id="compPrevBeedis">0 Pcs</span>
                 </div>
               </div>
@@ -246,12 +259,12 @@
               </div>
               <div class="comp-values-row">
                 <div class="comp-col">
-                  <span class="comp-col-label" data-i18n="currentPeriodTitle">தற்போதைய காலம்</span>
+                  <span class="comp-col-label comp-label-current" data-i18n="currentPeriodTitle">தற்போதைய காலம்</span>
                   <span class="comp-val current" id="compCurRate">₹0</span>
                 </div>
                 <div class="comp-divider">vs</div>
                 <div class="comp-col">
-                  <span class="comp-col-label" data-i18n="previousPeriodTitle">முந்தைய காலம்</span>
+                  <span class="comp-col-label comp-label-previous" data-i18n="previousPeriodTitle">முந்தைய காலம்</span>
                   <span class="comp-val prev" id="compPrevRate">₹0</span>
                 </div>
               </div>
@@ -265,12 +278,12 @@
               </div>
               <div class="comp-values-row">
                 <div class="comp-col">
-                  <span class="comp-col-label" data-i18n="currentPeriodTitle">தற்போதைய காலம்</span>
+                  <span class="comp-col-label comp-label-current" data-i18n="currentPeriodTitle">தற்போதைய காலம்</span>
                   <span class="comp-val current" id="compCurSalary">₹0</span>
                 </div>
                 <div class="comp-divider">vs</div>
                 <div class="comp-col">
-                  <span class="comp-col-label" data-i18n="previousPeriodTitle">முந்தைய காலம்</span>
+                  <span class="comp-col-label comp-label-previous" data-i18n="previousPeriodTitle">முந்தைய காலம்</span>
                   <span class="comp-val prev" id="compPrevSalary">₹0</span>
                 </div>
               </div>
@@ -284,12 +297,12 @@
               </div>
               <div class="comp-values-row">
                 <div class="comp-col">
-                  <span class="comp-col-label" data-i18n="currentPeriodTitle">தற்போதைய காலம்</span>
+                  <span class="comp-col-label comp-label-current" data-i18n="currentPeriodTitle">தற்போதைய காலம்</span>
                   <span class="comp-val current" id="compCurExpenses">₹0</span>
                 </div>
                 <div class="comp-divider">vs</div>
                 <div class="comp-col">
-                  <span class="comp-col-label" data-i18n="previousPeriodTitle">முந்தைய காலம்</span>
+                  <span class="comp-col-label comp-label-previous" data-i18n="previousPeriodTitle">முந்தைய காலம்</span>
                   <span class="comp-val prev" id="compPrevExpenses">₹0</span>
                 </div>
               </div>
@@ -303,12 +316,12 @@
               </div>
               <div class="comp-values-row">
                 <div class="comp-col">
-                  <span class="comp-col-label" data-i18n="currentPeriodTitle">தற்போதைய காலம்</span>
+                  <span class="comp-col-label comp-label-current" data-i18n="currentPeriodTitle">தற்போதைய காலம்</span>
                   <span class="comp-val current" id="compCurProfit">₹0</span>
                 </div>
                 <div class="comp-divider">vs</div>
                 <div class="comp-col">
-                  <span class="comp-col-label" data-i18n="previousPeriodTitle">முந்தைய காலம்</span>
+                  <span class="comp-col-label comp-label-previous" data-i18n="previousPeriodTitle">முந்தைய காலம்</span>
                   <span class="comp-val prev" id="compPrevProfit">₹0</span>
                 </div>
               </div>
