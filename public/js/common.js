@@ -50,8 +50,11 @@ const nativeFetch = window.fetch.bind(window);
 
 // A page can remain open after its server-side session expires. Redirect it
 // when the next protected request confirms that authentication is no longer valid.
+let pendingRequests = 0;
+
 window.fetch = async function(...args) {
-  // Show loading overlay before any request
+  // Increment pending counter and show loading overlay
+  pendingRequests++;
   setAppLoading(true, 'Loading...');
   try {
     const response = await nativeFetch(...args);
@@ -62,8 +65,11 @@ window.fetch = async function(...args) {
     }
     return response;
   } finally {
-    // Hide loading overlay after request completes or errors
-    setAppLoading(false);
+    // Decrement counter and hide overlay only when all requests complete
+    pendingRequests--;
+    if (pendingRequests <= 0) {
+      setAppLoading(false);
+    }
   }
 };
 
