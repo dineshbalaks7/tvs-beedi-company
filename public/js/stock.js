@@ -727,7 +727,17 @@ async function downloadStockPDF() {
   if (!container) return;
   container.innerHTML = html;
 
-  await new Promise(resolve => setTimeout(resolve, 100));
+  // Temporarily make the wrapper visible so html2canvas can render it
+  // (z-index: -9999 causes a blank render)
+  const wrapper = document.getElementById('pdfOffscreenWrapper');
+  if (wrapper) {
+    wrapper.style.zIndex = '9999';
+    wrapper.style.left = '-9999px';
+    wrapper.style.top = '0';
+  }
+
+  // Wait for fonts and layout to settle
+  await new Promise(resolve => setTimeout(resolve, 200));
 
   const element = container.querySelector('#tvsStockReportDoc') || container;
 
@@ -746,7 +756,8 @@ async function downloadStockPDF() {
         scale: 2,
         useCORS: true,
         backgroundColor: '#ffffff',
-        logging: false
+        logging: false,
+        allowTaint: true
       },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
       pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
@@ -758,6 +769,11 @@ async function downloadStockPDF() {
     console.error('PDF export error:', err);
     showToast(isEn ? 'PDF export failed. Try Print instead.' : 'PDF ஏற்றுமதி தோல்வியடைந்தது.', 'error');
   } finally {
+    // Restore the wrapper back to its hidden state
+    if (wrapper) {
+      wrapper.style.zIndex = '-9999';
+      wrapper.style.left = '0';
+    }
     if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
   }
 }
