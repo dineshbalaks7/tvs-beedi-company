@@ -695,6 +695,73 @@ async function downloadStockImage() {
   }
 }
 
+async function downloadStockPDF() {
+  const fromInput = document.getElementById('stockReportFromDate');
+  const toInput = document.getElementById('stockReportToDate');
+  const itemSelect = document.getElementById('stockReportMaterialFilter');
+  const from = fromInput ? fromInput.value : '';
+  const to = toInput ? toInput.value : '';
+  const item = itemSelect ? itemSelect.value : 'all';
+
+  const isEn = (typeof currentLanguage !== 'undefined' && currentLanguage === 'en');
+  showToast(isEn ? 'Generating PDF...' : 'PDF தயாராகிறது...', 'info');
+
+  let data = cachedMonthlyStockReport;
+  const normalizedItem = (item === 'leaf' ? 'tobacco' : item);
+  if (!data || data.from !== from || data.to !== to || data.itemFilter !== normalizedItem) {
+    data = await loadStockReportData(from, to, item);
+  }
+
+  if (!data) {
+    showToast(isEn ? 'Could not load report data' : 'அறிக்கை விவரங்களை ஏற்ற முடியவில்லை', 'error');
+    return;
+  }
+
+  if (typeof html2pdf === 'undefined') {
+    showToast(isEn ? 'PDF library not loaded. Try again.' : 'PDF நூலகம் ஏற்றப்படவில்லை.', 'error');
+    return;
+  }
+
+  const html = generateStockReportHTML(data);
+  const container = document.getElementById('pdfPrintableSheet');
+  if (!container) return;
+  container.innerHTML = html;
+
+  await new Promise(resolve => setTimeout(resolve, 100));
+
+  const element = container.querySelector('#tvsStockReportDoc') || container;
+
+  const matTag = (data.itemFilter === 'tobacco' ? 'Leaf' : (data.itemFilter === 'powder' ? 'Powder' : (data.itemFilter === 'sona' ? 'SONA' : (data.itemFilter === 'a1' ? 'A1' : (data.itemFilter === 'super' ? 'SUPER' : 'All')))));
+  const filename = `TVS_Stock_${matTag}_${data.from}_to_${data.to}.pdf`;
+
+  const btn = document.getElementById('btnDownloadStockPDF');
+  if (btn) { btn.disabled = true; btn.style.opacity = '0.7'; }
+
+  try {
+    const opt = {
+      margin: [8, 8, 8, 8],
+      filename: filename,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+        logging: false
+      },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+    };
+
+    await html2pdf().set(opt).from(element).save();
+    showToast(isEn ? 'PDF downloaded successfully!' : 'PDF வெற்றிகரமாக பதிவிறக்கப்பட்டது!', 'success');
+  } catch (err) {
+    console.error('PDF export error:', err);
+    showToast(isEn ? 'PDF export failed. Try Print instead.' : 'PDF ஏற்றுமதி தோல்வியடைந்தது.', 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+  }
+}
+
 async function previewMonthlyStockReport() {
   const fromInput = document.getElementById('stockReportFromDate');
   const toInput = document.getElementById('stockReportToDate');
