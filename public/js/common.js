@@ -51,12 +51,20 @@ const nativeFetch = window.fetch.bind(window);
 // A page can remain open after its server-side session expires. Redirect it
 // when the next protected request confirms that authentication is no longer valid.
 window.fetch = async function(...args) {
-  const response = await nativeFetch(...args);
-  if (response.status === 401 && !redirectingToLogin && window.location.pathname !== '/login.html') {
-    redirectingToLogin = true;
-    window.location.replace('/login.html?expired=1');
+  // Show loading overlay before any request
+  setAppLoading(true, 'Loading...');
+  try {
+    const response = await nativeFetch(...args);
+    // Handle session expiration
+    if (response.status === 401 && !redirectingToLogin && window.location.pathname !== '/login.html') {
+      redirectingToLogin = true;
+      window.location.replace('/login.html?expired=1');
+    }
+    return response;
+  } finally {
+    // Hide loading overlay after request completes or errors
+    setAppLoading(false);
   }
-  return response;
 };
 
 // 1. Theme Management
