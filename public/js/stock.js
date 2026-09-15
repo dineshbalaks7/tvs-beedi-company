@@ -197,6 +197,13 @@ function openStockModal(item = 'tobacco', type = 'add') {
   }
 
   updateStockModalItemFields();
+
+  // Pre-fill date with today
+  const dateInput = document.getElementById('stockActionDate');
+  if (dateInput && !dateInput.value) {
+    dateInput.value = new Date().toISOString().split('T')[0];
+  }
+
   if (modal) modal.classList.add('active');
 }
 
@@ -211,11 +218,12 @@ async function handleStockActionSubmit(event) {
   const item = document.getElementById('stockActionItem').value;
   const quantityKg = document.getElementById('stockActionKg').value;
   const notes = item === 'powder' ? '' : document.getElementById('stockActionNotes').value;
+  const date = document.getElementById('stockActionDate')?.value || '';
 
   const endpoint = (type === 'adjust') ? '/api/stock/adjust' : '/api/stock/add';
   const payload = (type === 'adjust')
-    ? { item, newQuantityKg: quantityKg, notes }
-    : { item, quantityKg, notes };
+    ? { item, newQuantityKg: quantityKg, notes, date }
+    : { item, quantityKg, notes, date };
 
   try {
     const res = await fetch(endpoint, {

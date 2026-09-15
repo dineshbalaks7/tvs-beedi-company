@@ -103,7 +103,7 @@ async function recordStockUsage(tobaccoUsedGrams, powderUsedGrams, productionId 
   return { tobaccoStock, powderStock };
 }
 
-async function addStock(item, quantityKg, notes = '') {
+async function addStock(item, quantityKg, notes = '', date = null) {
   const gramsToAdd = Math.round(quantityKg * 1000);
   const stock = await Stock.getStock(item);
   stock.quantityGrams += gramsToAdd;
@@ -111,6 +111,7 @@ async function addStock(item, quantityKg, notes = '') {
   await stock.save();
 
   const cleanNotes = (notes && notes.trim()) ? notes.trim() : (item === 'powder' ? '------' : '');
+  const movementDate = date ? new Date(date) : new Date();
 
   const movement = await StockMovement.create({
     item,
@@ -118,7 +119,8 @@ async function addStock(item, quantityKg, notes = '') {
     quantityGrams: gramsToAdd,
     balanceAfterGrams: stock.quantityGrams,
     variety: cleanNotes,
-    notes: cleanNotes
+    notes: cleanNotes,
+    date: movementDate
   });
 
   return { stock, movement };

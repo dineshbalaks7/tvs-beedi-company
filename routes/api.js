@@ -975,13 +975,13 @@ router.get('/stock/report', async (req, res) => {
 
 router.post('/stock/add', async (req, res) => {
   try {
-    const { item, quantityKg, notes } = req.body;
+    const { item, quantityKg, notes, date } = req.body;
     const kg = Number(quantityKg);
     if (!['tobacco', 'powder'].includes(item) || !kg || kg <= 0) {
       return res.status(400).json({ error: 'Invalid item or quantity' });
     }
 
-    const result = await addStock(item, kg, notes ? notes.trim() : '');
+    const result = await addStock(item, kg, notes ? notes.trim() : '', date || null);
     res.json(result);
   } catch (error) {
     res.status(500).json({ error: error.message });
