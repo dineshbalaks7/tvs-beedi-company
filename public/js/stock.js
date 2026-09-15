@@ -744,7 +744,7 @@ async function downloadStockPDF() {
   const tempWrap = document.createElement('div');
   tempWrap.style.cssText = `
     position: fixed;
-    left: 0;
+    left: -9999px;
     top: 0;
     width: 780px;
     background: #ffffff;
