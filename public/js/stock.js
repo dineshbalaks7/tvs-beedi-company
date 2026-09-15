@@ -699,119 +699,144 @@ async function downloadStockPDF() {
   const fromInput = document.getElementById('stockReportFromDate');
   const toInput = document.getElementById('stockReportToDate');
   const itemSelect = document.getElementById('stockReportMaterialFilter');
+
   const from = fromInput ? fromInput.value : '';
   const to = toInput ? toInput.value : '';
   const item = itemSelect ? itemSelect.value : 'all';
 
   const isEn = (typeof currentLanguage !== 'undefined' && currentLanguage === 'en');
+
   showToast(isEn ? 'Generating PDF...' : 'PDF தயாராகிறது...', 'info');
 
+  // --- LOAD REPORT DATA ---
   let data = cachedMonthlyStockReport;
   const normalizedItem = (item === 'leaf' ? 'tobacco' : item);
   if (!data || data.from !== from || data.to !== to || data.itemFilter !== normalizedItem) {
     data = await loadStockReportData(from, to, item);
   }
-
   if (!data) {
     showToast(isEn ? 'Could not load report data' : 'அறிக்கை விவரங்களை ஏற்ற முடியவில்லை', 'error');
     return;
   }
 
+  // --- CHECK html2canvas ---
   if (typeof html2canvas === 'undefined') {
     showToast(isEn ? 'Canvas library not loaded.' : 'Canvas நூலகம் ஏற்றப்படவில்லை.', 'error');
+    console.error('html2canvas library is not loaded.');
+    return;
+  }
+
+  // --- CHECK jsPDF ---
+  let jsPDFClass = null;
+  if (window.jspdf && window.jspdf.jsPDF) {
+    jsPDFClass = window.jspdf.jsPDF;
+  }
+  if (!jsPDFClass) {
+    showToast(isEn ? 'PDF library not loaded.' : 'PDF நூலகம் ஏற்றப்படவில்லை.', 'error');
+    console.error('jsPDF library is not loaded.');
     return;
   }
 
   const btn = document.getElementById('btnDownloadStockPDF');
   if (btn) { btn.disabled = true; btn.style.opacity = '0.7'; }
 
-  // Create a temporary visible clone directly in <body> so html2canvas can paint it
+  // --- CREATE TEMPORARY VISIBLE ELEMENT ---
   const tempWrap = document.createElement('div');
-  tempWrap.style.cssText = [
-    'position:absolute',
-    'top:0',
-    'left:0',
-    'width:780px',
-    'background:#ffffff',
-    'z-index:99999',
-    'pointer-events:none',
-    'visibility:visible',
-    'opacity:1'
-  ].join(';');
+  tempWrap.style.cssText = `
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 780px;
+    background: #ffffff;
+    z-index: 999999;
+    pointer-events: none;
+    visibility: visible;
+    opacity: 1;
+    overflow: visible;
+  `;
   tempWrap.innerHTML = generateStockReportHTML(data);
   document.body.appendChild(tempWrap);
 
-  // Let the browser lay out and render fonts
-  await new Promise(resolve => setTimeout(resolve, 300));
-
-  const matTag = (data.itemFilter === 'tobacco' ? 'Leaf' : (data.itemFilter === 'powder' ? 'Powder' : (data.itemFilter === 'sona' ? 'SONA' : (data.itemFilter === 'a1' ? 'A1' : (data.itemFilter === 'super' ? 'SUPER' : 'All')))));
-  const filename = `TVS_Stock_${matTag}_${data.from}_to_${data.to}.pdf`;
+  // Give browser time to render Tamil fonts, tables and layout
+  await new Promise(resolve => setTimeout(resolve, 500));
 
   try {
-    const canvas = await html2canvas(tempWrap, {
+    const element = tempWrap.querySelector('#tvsStockReportDoc') || tempWrap;
+    if (!element) throw new Error('Report element was not created.');
+
+    // --- RENDER AS CANVAS ---
+    const canvas = await html2canvas(element, {
       scale: 2,
       useCORS: true,
+      allowTaint: true,
       backgroundColor: '#ffffff',
       logging: false,
       scrollX: 0,
       scrollY: 0,
-      windowWidth: 780
+      windowWidth: 780,
+      foreignObjectRendering: false
     });
+    if (!canvas || !canvas.width || !canvas.height) throw new Error('Report canvas is empty.');
 
-    const imgData = canvas.toDataURL('image/jpeg', 0.95);
-    const imgW = 210; // A4 width in mm
-    const pageH = 297; // A4 height in mm
-    const imgH = (canvas.height * imgW) / canvas.width;
+    // --- CREATE A4 PDF ---
+    const pdf = new jsPDFClass({ orientation: 'portrait', unit: 'mm', format: 'a4', compress: true });
 
-    // Use jsPDF bundled inside html2pdf
-    const { jsPDF } = window.jspdf || {};
-    let pdf;
-    if (jsPDF) {
-      pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
-    } else if (typeof html2pdf !== 'undefined') {
-      // Fallback: use html2pdf's internal jsPDF via a temp worker
-      const worker = html2pdf().set({
-        margin: 0,
-        filename,
-        image: { type: 'jpeg', quality: 0.95 },
-        html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-      });
-      await worker.from(tempWrap).save();
-      showToast(isEn ? 'PDF downloaded successfully!' : 'PDF வெற்றிகரமாக பதிவிறக்கப்பட்டது!', 'success');
-      return;
-    } else {
-      showToast(isEn ? 'PDF library not available.' : 'PDF நூலகம் இல்லை.', 'error');
-      return;
-    }
+    const pageWidth = 210;
+    const pageHeight = 297;
+    const margin = 5;
+    const usableWidth = pageWidth - margin * 2;
+    const usableHeight = pageHeight - margin * 2;
 
-    let yPos = 0;
-    let remainingH = imgH;
-    let srcY = 0;
+    const canvasRatio = canvas.width / canvas.height;
+    const imageWidth = usableWidth;
+    const imageHeight = imageWidth / canvasRatio;
 
-    // Slice canvas across multiple A4 pages
-    while (remainingH > 0) {
-      const sliceH = Math.min(pageH, remainingH);
+    // --- MULTI-PAGE SLICING ---
+    let sourceY = 0;
+    let remainingHeight = canvas.height;
+    const pageCanvasHeight = Math.floor(canvas.height * (usableHeight / imageHeight));
+    let firstPage = true;
+
+    while (remainingHeight > 0) {
+      const currentSliceHeight = Math.min(pageCanvasHeight, remainingHeight);
+
       const sliceCanvas = document.createElement('canvas');
       sliceCanvas.width = canvas.width;
-      sliceCanvas.height = Math.round((sliceH / imgH) * canvas.height);
+      sliceCanvas.height = currentSliceHeight;
       const ctx = sliceCanvas.getContext('2d');
-      ctx.drawImage(canvas, 0, srcY, canvas.width, sliceCanvas.height, 0, 0, canvas.width, sliceCanvas.height);
-      const sliceData = sliceCanvas.toDataURL('image/jpeg', 0.95);
-      if (yPos > 0) pdf.addPage();
-      pdf.addImage(sliceData, 'JPEG', 0, 0, imgW, sliceH);
-      srcY += sliceCanvas.height;
-      yPos += sliceH;
-      remainingH -= sliceH;
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, sliceCanvas.width, sliceCanvas.height);
+      ctx.drawImage(canvas, 0, sourceY, canvas.width, currentSliceHeight, 0, 0, canvas.width, currentSliceHeight);
+
+      const sliceData = sliceCanvas.toDataURL('image/jpeg', 0.98);
+      if (!firstPage) pdf.addPage();
+
+      const sliceHeightMM = (currentSliceHeight / canvas.width) * imageWidth;
+      pdf.addImage(sliceData, 'JPEG', margin, margin, imageWidth, sliceHeightMM, undefined, 'FAST');
+
+      sourceY += currentSliceHeight;
+      remainingHeight -= currentSliceHeight;
+      firstPage = false;
     }
+
+    // --- FILE NAME & DOWNLOAD ---
+    const matTag =
+      data.itemFilter === 'tobacco' ? 'Leaf'
+      : data.itemFilter === 'powder' ? 'Powder'
+      : data.itemFilter === 'sona' ? 'SONA'
+      : data.itemFilter === 'a1' ? 'A1'
+      : data.itemFilter === 'super' ? 'SUPER'
+      : 'All';
+    const filename = `TVS_Stock_${matTag}_${data.from}_to_${data.to}.pdf`;
 
     pdf.save(filename);
     showToast(isEn ? 'PDF downloaded successfully!' : 'PDF வெற்றிகரமாக பதிவிறக்கப்பட்டது!', 'success');
+
   } catch (err) {
     console.error('PDF export error:', err);
-    showToast(isEn ? 'PDF export failed. Try Print instead.' : 'PDF ஏற்றுமதி தோல்வியடைந்தது.', 'error');
+    showToast(isEn ? 'PDF export failed. Please try again.' : 'PDF ஏற்றுமதி தோல்வியடைந்தது. மீண்டும் முயற்சிக்கவும்.', 'error');
   } finally {
-    document.body.removeChild(tempWrap);
+    if (tempWrap && tempWrap.parentNode) tempWrap.parentNode.removeChild(tempWrap);
     if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
   }
 }
@@ -858,8 +883,8 @@ function printMonthlyStockReport() {
 }
 
 // Aliases for template and backwards compatibility
-const downloadMonthlyStockPDF = downloadStockImage;
-const downloadStockReportPDF = downloadStockImage;
+const downloadMonthlyStockPDF = downloadStockPDF;
+const downloadStockReportPDF = downloadStockPDF;
 const downloadMonthlyStockImage = downloadStockImage;
 const downloadStockImageBtn = downloadStockImage;
 
