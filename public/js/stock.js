@@ -717,63 +717,101 @@ async function downloadStockPDF() {
     return;
   }
 
-  if (typeof html2pdf === 'undefined') {
-    showToast(isEn ? 'PDF library not loaded. Try again.' : 'PDF நூலகம் ஏற்றப்படவில்லை.', 'error');
+  if (typeof html2canvas === 'undefined') {
+    showToast(isEn ? 'Canvas library not loaded.' : 'Canvas நூலகம் ஏற்றப்படவில்லை.', 'error');
     return;
   }
-
-  const html = generateStockReportHTML(data);
-  const container = document.getElementById('pdfPrintableSheet');
-  if (!container) return;
-  container.innerHTML = html;
-
-  // Temporarily make the wrapper visible so html2canvas can render it
-  // (z-index: -9999 causes a blank render)
-  const wrapper = document.getElementById('pdfOffscreenWrapper');
-  if (wrapper) {
-    wrapper.style.zIndex = '9999';
-    wrapper.style.left = '-9999px';
-    wrapper.style.top = '0';
-  }
-
-  // Wait for fonts and layout to settle
-  await new Promise(resolve => setTimeout(resolve, 200));
-
-  const element = container.querySelector('#tvsStockReportDoc') || container;
-
-  const matTag = (data.itemFilter === 'tobacco' ? 'Leaf' : (data.itemFilter === 'powder' ? 'Powder' : (data.itemFilter === 'sona' ? 'SONA' : (data.itemFilter === 'a1' ? 'A1' : (data.itemFilter === 'super' ? 'SUPER' : 'All')))));
-  const filename = `TVS_Stock_${matTag}_${data.from}_to_${data.to}.pdf`;
 
   const btn = document.getElementById('btnDownloadStockPDF');
   if (btn) { btn.disabled = true; btn.style.opacity = '0.7'; }
 
-  try {
-    const opt = {
-      margin: [8, 8, 8, 8],
-      filename: filename,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: '#ffffff',
-        logging: false,
-        allowTaint: true
-      },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-      pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
-    };
+  // Create a temporary visible clone directly in <body> so html2canvas can paint it
+  const tempWrap = document.createElement('div');
+  tempWrap.style.cssText = [
+    'position:absolute',
+    'top:0',
+    'left:0',
+    'width:780px',
+    'background:#ffffff',
+    'z-index:99999',
+    'pointer-events:none',
+    'visibility:visible',
+    'opacity:1'
+  ].join(';');
+  tempWrap.innerHTML = generateStockReportHTML(data);
+  document.body.appendChild(tempWrap);
 
-    await html2pdf().set(opt).from(element).save();
+  // Let the browser lay out and render fonts
+  await new Promise(resolve => setTimeout(resolve, 300));
+
+  const matTag = (data.itemFilter === 'tobacco' ? 'Leaf' : (data.itemFilter === 'powder' ? 'Powder' : (data.itemFilter === 'sona' ? 'SONA' : (data.itemFilter === 'a1' ? 'A1' : (data.itemFilter === 'super' ? 'SUPER' : 'All')))));
+  const filename = `TVS_Stock_${matTag}_${data.from}_to_${data.to}.pdf`;
+
+  try {
+    const canvas = await html2canvas(tempWrap, {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: '#ffffff',
+      logging: false,
+      scrollX: 0,
+      scrollY: 0,
+      windowWidth: 780
+    });
+
+    const imgData = canvas.toDataURL('image/jpeg', 0.95);
+    const imgW = 210; // A4 width in mm
+    const pageH = 297; // A4 height in mm
+    const imgH = (canvas.height * imgW) / canvas.width;
+
+    // Use jsPDF bundled inside html2pdf
+    const { jsPDF } = window.jspdf || {};
+    let pdf;
+    if (jsPDF) {
+      pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
+    } else if (typeof html2pdf !== 'undefined') {
+      // Fallback: use html2pdf's internal jsPDF via a temp worker
+      const worker = html2pdf().set({
+        margin: 0,
+        filename,
+        image: { type: 'jpeg', quality: 0.95 },
+        html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      });
+      await worker.from(tempWrap).save();
+      showToast(isEn ? 'PDF downloaded successfully!' : 'PDF வெற்றிகரமாக பதிவிறக்கப்பட்டது!', 'success');
+      return;
+    } else {
+      showToast(isEn ? 'PDF library not available.' : 'PDF நூலகம் இல்லை.', 'error');
+      return;
+    }
+
+    let yPos = 0;
+    let remainingH = imgH;
+    let srcY = 0;
+
+    // Slice canvas across multiple A4 pages
+    while (remainingH > 0) {
+      const sliceH = Math.min(pageH, remainingH);
+      const sliceCanvas = document.createElement('canvas');
+      sliceCanvas.width = canvas.width;
+      sliceCanvas.height = Math.round((sliceH / imgH) * canvas.height);
+      const ctx = sliceCanvas.getContext('2d');
+      ctx.drawImage(canvas, 0, srcY, canvas.width, sliceCanvas.height, 0, 0, canvas.width, sliceCanvas.height);
+      const sliceData = sliceCanvas.toDataURL('image/jpeg', 0.95);
+      if (yPos > 0) pdf.addPage();
+      pdf.addImage(sliceData, 'JPEG', 0, 0, imgW, sliceH);
+      srcY += sliceCanvas.height;
+      yPos += sliceH;
+      remainingH -= sliceH;
+    }
+
+    pdf.save(filename);
     showToast(isEn ? 'PDF downloaded successfully!' : 'PDF வெற்றிகரமாக பதிவிறக்கப்பட்டது!', 'success');
   } catch (err) {
     console.error('PDF export error:', err);
     showToast(isEn ? 'PDF export failed. Try Print instead.' : 'PDF ஏற்றுமதி தோல்வியடைந்தது.', 'error');
   } finally {
-    // Restore the wrapper back to its hidden state
-    if (wrapper) {
-      wrapper.style.zIndex = '-9999';
-      wrapper.style.left = '0';
-    }
+    document.body.removeChild(tempWrap);
     if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
   }
 }
