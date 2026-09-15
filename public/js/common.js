@@ -15,9 +15,6 @@ window.appSettings = {
   profitPerBox: 120
 };
 
-let activeLoadingRequests = 0;
-let loadingHideTimer = null;
-
 function getLoadingScreen() {
   let screen = document.getElementById('appLoadingScreen');
   if (screen) return screen;
@@ -37,28 +34,29 @@ function setAppLoading(isLoading, message = 'Loading...') {
   const screen = getLoadingScreen();
   const text = screen.querySelector('.app-loading-text');
   if (text) text.textContent = message;
-  clearTimeout(loadingHideTimer);
   if (isLoading) {
     screen.classList.add('active');
     screen.setAttribute('aria-busy', 'true');
-  } else if (activeLoadingRequests === 0) {
-    loadingHideTimer = setTimeout(() => {
-      screen.classList.remove('active');
-      screen.setAttribute('aria-busy', 'false');
-    }, 120);
+  } else {
+    screen.classList.remove('active');
+    screen.setAttribute('aria-busy', 'false');
   }
 }
 
 window.setAppLoading = setAppLoading;
 
+let redirectingToLogin = false;
 const nativeFetch = window.fetch.bind(window);
-window.fetch = function(...args) {
-  activeLoadingRequests += 1;
-  setAppLoading(true);
-  return nativeFetch(...args).finally(() => {
-    activeLoadingRequests = Math.max(0, activeLoadingRequests - 1);
-    setAppLoading(false);
-  });
+
+// A page can remain open after its server-side session expires. Redirect it
+// when the next protected request confirms that authentication is no longer valid.
+window.fetch = async function(...args) {
+  const response = await nativeFetch(...args);
+  if (response.status === 401 && !redirectingToLogin && window.location.pathname !== '/login.html') {
+    redirectingToLogin = true;
+    window.location.replace('/login.html?expired=1');
+  }
+  return response;
 };
 
 // 1. Theme Management
@@ -232,22 +230,8 @@ async function fetchAppSettings() {
 
 // 7. Initialize Global Listeners on DOM Ready
 document.addEventListener('DOMContentLoaded', () => {
-  getLoadingScreen();
   initTheme();
   highlightActiveNav();
   setDefaultDatesToToday();
   fetchAppSettings();
-
-  document.addEventListener('submit', () => {
-    setAppLoading(true, 'Saving...');
-  }, true);
-
-  document.addEventListener('click', event => {
-    const link = event.target.closest('a[href]');
-    if (!link || link.target === '_blank' || event.defaultPrevented) return;
-    const href = link.getAttribute('href');
-    if (href && href.startsWith('/') && !href.startsWith('//')) {
-      setAppLoading(true, 'Loading...');
-    }
-  });
 });

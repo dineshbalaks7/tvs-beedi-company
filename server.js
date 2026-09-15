@@ -34,6 +34,7 @@ const MONGODB_LOG_TARGET = (() => {
 const ADMIN_USERNAME = process.env.ADMIN_USERNAME || 'admin';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
 const SESSION_SECRET = process.env.SESSION_SECRET || 'change-this-session-secret';
+const SESSION_IDLE_TIMEOUT_MS = 30 * 60 * 1000;
 
 function hashPassword(password, salt = crypto.randomBytes(16).toString('hex')) {
   return new Promise((resolve, reject) => {
@@ -61,7 +62,7 @@ app.use(express.urlencoded({ extended: true }));
 // Session Store with error handling
 const sessionStore = MongoStore.create({
   mongoUrl: MONGODB_URI,
-  ttl: 8 * 60 * 60
+  ttl: SESSION_IDLE_TIMEOUT_MS / 1000
 });
 sessionStore.on('error', (err) => {
   console.error('Session store error:', err.message || err);
@@ -71,12 +72,15 @@ app.use(session({
   secret: SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
+  // Renew the session cookie only when the browser makes a request. With no
+  // client activity, the cookie and MongoDB session expire after 30 minutes.
+  rolling: true,
   store: sessionStore,
   cookie: {
     httpOnly: true,
     sameSite: 'lax',
     secure: process.env.NODE_ENV === 'production',
-    maxAge: 8 * 60 * 60 * 1000
+    maxAge: SESSION_IDLE_TIMEOUT_MS
   }
 }));
 
@@ -364,4 +368,3 @@ if (require.main === module) {
 }
 
 module.exports = app;
-
