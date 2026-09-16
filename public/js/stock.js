@@ -308,9 +308,47 @@ async function handleEditStockMovementSubmit(event) {
   }
 }
 
+function confirmStockMovementDeletion(isEn) {
+  return new Promise(resolve => {
+    const existing = document.getElementById('stockDeleteConfirmModal');
+    if (existing) existing.remove();
+
+    const modal = document.createElement('div');
+    modal.id = 'stockDeleteConfirmModal';
+    modal.className = 'modal-overlay active';
+    modal.innerHTML = `
+      <div class="modal-dialog confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="stockDeleteConfirmTitle">
+        <div class="modal-header">
+          <h3 id="stockDeleteConfirmTitle">${isEn ? 'Delete Stock Movement' : 'சரக்கு பதிவை நீக்கவும்'}</h3>
+          <button type="button" class="modal-close-btn" aria-label="Close">&times;</button>
+        </div>
+        <div class="modal-body">
+          <p>${isEn ? 'Are you sure you want to delete this movement record?' : 'இந்த சரக்கு பதிவை நீக்க விரும்புகிறீர்களா?'}</p>
+        </div>
+        <div class="modal-actions-row">
+          <button type="button" class="btn-secondary confirm-cancel">${isEn ? 'Cancel' : 'ரத்து'}</button>
+          <button type="button" class="btn-danger confirm-delete">${isEn ? 'Delete' : 'நீக்கு'}</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+
+    const close = result => {
+      modal.remove();
+      resolve(result);
+    };
+    modal.querySelector('.modal-close-btn').addEventListener('click', () => close(false));
+    modal.querySelector('.confirm-cancel').addEventListener('click', () => close(false));
+    modal.querySelector('.confirm-delete').addEventListener('click', () => close(true));
+    modal.addEventListener('click', event => {
+      if (event.target === modal) close(false);
+    });
+  });
+}
+
 async function deleteStockMovementAction(movementId) {
   const isEn = (typeof currentLanguage !== 'undefined' && currentLanguage === 'en');
-  if (!confirm(isEn ? 'Are you sure you want to delete this movement record?' : 'இந்த சரக்கு பதிவை நீக்க விரும்புகிறீர்களா?')) return;
+  if (!await confirmStockMovementDeletion(isEn)) return;
 
   try {
     const res = await fetch(`/api/stock/movement/${movementId}`, {

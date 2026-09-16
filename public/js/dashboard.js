@@ -14,6 +14,7 @@ let dashExportGranularity = 'day';
 let dashProfitGranularity = 'day';
 let dashboardRequestId = 0;
 const dashboardChartHistoryCache = {};
+const dashboardOverviewHistoryCache = {};
 
 function getCalendarDate(value) {
   if (typeof value === 'string') {
@@ -67,6 +68,19 @@ function setDashboardLoading(isLoading) {
   view.setAttribute('aria-busy', String(isLoading));
 }
 
+function getProfitMetrics(summary) {
+  const rate = Number(summary?.rate || 0);
+  const salary = Number(summary?.salary || 0);
+  const expenses = Number(summary?.expenses || 0);
+  const beedis = Number(summary?.beedis || 0);
+  const commissionPercent = Number(window.appSettings?.commissionPercent ?? 0.10);
+  const ratePer1000 = Number(window.appSettings?.ratePer1000 ?? 340);
+  const commissionAmount = Number(summary?.commissionAmount ?? ((beedis * commissionPercent) / 1000 * ratePer1000));
+  const profitWithoutCommission = Number(summary?.profitWithoutCommission ?? (rate - salary - expenses));
+  const totalProfit = Number(summary?.totalProfit ?? (profitWithoutCommission + commissionAmount));
+  return { profitWithoutCommission, commissionAmount, totalProfit };
+}
+
 function updateDashboardPeriodPills() {
   const isEn = (typeof currentLanguage !== 'undefined' && currentLanguage === 'en');
   const btnDay = document.getElementById('btnPeriodDay');
@@ -107,6 +121,8 @@ async function loadDashboardAnalytics(period = 'day') {
     cachedAnalytics = data;
     renderDashboardUI(data);
     await renderDashboardCharts(data);
+    loadDashboardOverviewHistory('week');
+    loadDashboardOverviewHistory('month');
   } catch (err) {
     console.error('Error loading dashboard analytics:', err);
     showToast('Failed to load dashboard data', 'error');
@@ -130,9 +146,216 @@ async function loadDashboardChartHistory(granularity) {
   return dashboardChartHistoryCache[granularity];
 }
 
+function overviewMonthKey(value) {
+  return String(value || '').slice(0, 7);
+}
+
+function overviewMonthLabel(monthKey, isEn) {
+  const [year, month] = monthKey.split('-').map(Number);
+  if (!year || !month) return monthKey;
+  return new Date(year, month - 1, 1).toLocaleDateString(isEn ? 'en-US' : 'ta-IN', { month: 'long', year: 'numeric' });
+}
+
+function overviewSummaryFromHistory(row) {
+  return {
+    boxes: Number(row.prodBoxes ?? row.boxes ?? 0),
+    cuts: Number(row.prodCuts ?? row.cuts ?? 0),
+    beedis: Number(row.prodBeedis ?? row.beedis ?? 0),
+    rate: Number(row.prodRate ?? row.rate ?? 0),
+    salary: Number(row.prodSalary ?? row.salary ?? 0),
+    expenses: Number(row.expenses ?? 0),
+    profitWithoutCommission: row.profitWithoutCommission,
+    commissionAmount: row.commissionAmount,
+    totalProfit: row.totalProfit,
+    profit: row.totalProfit ?? row.profit ?? 0
+  };
+}
+
+function renderOverviewDifferences(prefix, summary, previousSummary) {
+  const metrics = getProfitMetrics(summary);
+  const previousMetrics = previousSummary ? getProfitMetrics(previousSummary) : null;
+  const values = {
+    Rate: [summary.rate, previousSummary?.rate],
+    Salary: [summary.salary, previousSummary?.salary],
+    Expenses: [summary.expenses, previousSummary?.expenses],
+    BaseProfit: [metrics.profitWithoutCommission, previousMetrics?.profitWithoutCommission],
+    Commission: [metrics.commissionAmount, previousMetrics?.commissionAmount],
+    TotalProfit: [metrics.totalProfit, previousMetrics?.totalProfit]
+  };
+
+  Object.entries(values).forEach(([metric, [current, previous]]) => {
+    const valueEl = document.getElementById(`dash${prefix}${metric}`);
+    if (!valueEl) return;
+    let differenceEl = document.getElementById(`dash${prefix}${metric}Growth`);
+    if (!differenceEl) {
+      differenceEl = document.createElement('div');
+      differenceEl.id = `dash${prefix}${metric}Growth`;
+      differenceEl.className = 'metric-sub overview-difference';
+      valueEl.insertAdjacentElement('afterend', differenceEl);
+    }
+    if (previous === undefined || previous === null) {
+      differenceEl.textContent = 'Δ —';
+      differenceEl.className = 'metric-sub overview-difference neutral';
+      return;
+    }
+    const difference = formatDeltaDisplay(Number(current || 0) - Number(previous || 0), 'currency');
+    differenceEl.textContent = `Δ ${difference.text}`;
+    differenceEl.className = `metric-sub overview-difference ${difference.cls}`;
+  });
+
+  const cutsValueEl = document.getElementById(`dash${prefix}Cuts`);
+  if (cutsValueEl) {
+    let cutsDifferenceEl = document.getElementById(`dash${prefix}CutsGrowth`);
+    if (!cutsDifferenceEl) {
+      cutsDifferenceEl = document.createElement('div');
+      cutsDifferenceEl.id = `dash${prefix}CutsGrowth`;
+      cutsDifferenceEl.className = 'metric-sub overview-difference';
+      cutsValueEl.insertAdjacentElement('afterend', cutsDifferenceEl);
+    }
+    if (!previousSummary) {
+      cutsDifferenceEl.textContent = 'Δ —';
+    } else {
+      const difference = formatDeltaDisplay(Number(summary.boxes || 0) - Number(previousSummary.boxes || 0), 'number', 'Boxes');
+      cutsDifferenceEl.textContent = `Δ ${difference.text}`;
+      cutsDifferenceEl.className = `metric-sub overview-difference ${difference.cls}`;
+    }
+  }
+}
+
+function renderOverviewSummary(prefix, summary, periodLabel, previousSummary = null) {
+  if (!summary) return;
+  const metrics = getProfitMetrics(summary);
+  const isEn = (typeof currentLanguage !== 'undefined' && currentLanguage === 'en');
+  const boxesEl = document.getElementById(`dash${prefix}Cuts`);
+  if (boxesEl) boxesEl.innerHTML = `${formatNumber(summary.boxes)} <span class="metric-unit">${isEn ? 'Boxes' : 'கட்டை'}</span>`;
+  const beedisEl = document.getElementById(`dash${prefix}Beedis`);
+  if (beedisEl) beedisEl.textContent = `${formatNumber(summary.beedis)} ${isEn ? 'Pcs' : 'பீடிகள்'} (${formatNumber(summary.cuts)} Cuts)`;
+  const rateEl = document.getElementById(`dash${prefix}Rate`);
+  if (rateEl) rateEl.textContent = formatINR(summary.rate);
+  const salaryEl = document.getElementById(`dash${prefix}Salary`);
+  if (salaryEl) salaryEl.textContent = formatINR(summary.salary);
+  const expensesEl = document.getElementById(`dash${prefix}Expenses`);
+  if (expensesEl) expensesEl.textContent = formatINR(summary.expenses);
+  const profitEl = document.getElementById(`dash${prefix}Profit`);
+  if (profitEl) {
+    profitEl.textContent = formatINR(metrics.totalProfit);
+    profitEl.style.color = metrics.totalProfit >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
+  }
+  const baseEl = document.getElementById(`dash${prefix}BaseProfit`);
+  if (baseEl) baseEl.textContent = formatINR(metrics.profitWithoutCommission);
+  const commissionEl = document.getElementById(`dash${prefix}Commission`);
+  if (commissionEl) commissionEl.textContent = formatINR(metrics.commissionAmount);
+  const totalEl = document.getElementById(`dash${prefix}TotalProfit`);
+  if (totalEl) {
+    totalEl.textContent = formatINR(metrics.totalProfit);
+    totalEl.style.color = metrics.totalProfit >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
+  }
+  const labelEl = document.getElementById(`dash${prefix}ProdLabel`);
+  if (labelEl && periodLabel) labelEl.textContent = periodLabel;
+  renderOverviewDifferences(prefix, summary, previousSummary);
+}
+
+function populateWeeklyOverviewFilters(series) {
+  const monthSelect = document.getElementById('dashWeekMonthFilter');
+  const weekSelect = document.getElementById('dashWeekFilter');
+  if (!monthSelect || !weekSelect || !series.length) return;
+  const isEn = (typeof currentLanguage !== 'undefined' && currentLanguage === 'en');
+  const monthKeys = [...new Set(series.map(row => overviewMonthKey(row.key)))].sort();
+  const selectedMonth = monthKeys.includes(monthSelect.value) ? monthSelect.value : monthKeys[monthKeys.length - 1];
+  monthSelect.innerHTML = monthKeys.map(key => `<option value="${key}">${overviewMonthLabel(key, isEn)}</option>`).join('');
+  monthSelect.value = selectedMonth;
+  filterWeeklyOverviewMonth(selectedMonth);
+}
+
+function filterWeeklyOverviewMonth(monthKey) {
+  const series = dashboardOverviewHistoryCache.week || [];
+  const weekSelect = document.getElementById('dashWeekFilter');
+  if (!weekSelect) return;
+  const monthRows = series.filter(row => overviewMonthKey(row.key) === monthKey);
+  const selectedWeek = monthRows.some(row => row.key === weekSelect.value) ? weekSelect.value : (monthRows[monthRows.length - 1]?.key || '');
+  const isEn = (typeof currentLanguage !== 'undefined' && currentLanguage === 'en');
+  weekSelect.innerHTML = monthRows.map((row, index) => `<option value="${row.key}">${isEn ? 'Week' : 'வாரம்'} ${index + 1} (${row.label})</option>`).join('');
+  weekSelect.value = selectedWeek;
+  filterWeeklyOverviewWeek(selectedWeek);
+}
+
+function filterWeeklyOverviewWeek(weekKey) {
+  const series = dashboardOverviewHistoryCache.week || [];
+  const rowIndex = series.findIndex(item => item.key === weekKey);
+  const row = rowIndex >= 0 ? series[rowIndex] : null;
+  if (!row) return;
+  const isEn = (typeof currentLanguage !== 'undefined' && currentLanguage === 'en');
+  const monthLabel = overviewMonthLabel(overviewMonthKey(row.key), isEn);
+  const weekSelect = document.getElementById('dashWeekFilter');
+  const weekIndex = weekSelect ? weekSelect.selectedIndex + 1 : 1;
+  const previousRow = rowIndex > 0 ? series[rowIndex - 1] : null;
+  renderOverviewSummary('Week', overviewSummaryFromHistory(row), `${isEn ? 'Week' : 'வாரம்'} ${weekIndex} - ${monthLabel}`, previousRow ? overviewSummaryFromHistory(previousRow) : null);
+}
+
+function filterMonthlyOverview(monthKey) {
+  const series = dashboardOverviewHistoryCache.month || [];
+  const rowIndex = series.findIndex(item => overviewMonthKey(item.key) === monthKey);
+  const row = rowIndex >= 0 ? series[rowIndex] : null;
+  if (!row) return;
+  const isEn = (typeof currentLanguage !== 'undefined' && currentLanguage === 'en');
+  const previousRow = rowIndex > 0 ? series[rowIndex - 1] : null;
+  renderOverviewSummary('Month', overviewSummaryFromHistory(row), `${isEn ? 'Month' : 'மாதம்'} - ${overviewMonthLabel(monthKey, isEn)}`, previousRow ? overviewSummaryFromHistory(previousRow) : null);
+}
+
+function populateMonthlyOverviewFilter(series) {
+  const select = document.getElementById('dashMonthFilter');
+  if (!select || !series.length) return;
+  const isEn = (typeof currentLanguage !== 'undefined' && currentLanguage === 'en');
+  const monthKeys = [...new Set(series.map(row => overviewMonthKey(row.key)))].sort();
+  const selectedMonth = monthKeys.includes(select.value) ? select.value : monthKeys[monthKeys.length - 1];
+  select.innerHTML = monthKeys.map(key => `<option value="${key}">${overviewMonthLabel(key, isEn)}</option>`).join('');
+  select.value = selectedMonth;
+  filterMonthlyOverview(selectedMonth);
+}
+
+function populateDailyOverviewFilter(series) {
+  const select = document.getElementById('dashDayFilter');
+  if (!select || !series.length) return;
+  const firstDay = series[0].key;
+  const lastDay = series[series.length - 1].key;
+  const selectedDay = series.some(row => row.key === select.value) ? select.value : lastDay;
+  select.min = firstDay;
+  select.max = lastDay;
+  select.value = selectedDay;
+  filterDailyOverview(selectedDay);
+}
+
+function filterDailyOverview(dayKey) {
+  const series = dashboardOverviewHistoryCache.day || [];
+  const rowIndex = series.findIndex(item => item.key === dayKey);
+  const row = rowIndex >= 0 ? series[rowIndex] : null;
+  if (!row) return;
+  const isEn = (typeof currentLanguage !== 'undefined' && currentLanguage === 'en');
+  const previousRow = rowIndex > 0 ? series[rowIndex - 1] : null;
+  renderOverviewSummary('Day', overviewSummaryFromHistory(row), `${isEn ? 'Daily' : 'தினசரி'} - ${row.label}`, previousRow ? overviewSummaryFromHistory(previousRow) : null);
+}
+
+async function loadDashboardOverviewHistory(granularity) {
+  if (!dashboardOverviewHistoryCache[granularity]) {
+    try {
+      const res = await fetch(`/api/analytics/history?granularity=${granularity}&limit=24`);
+      if (!res.ok) throw new Error('Failed to load overview history');
+      const data = await res.json();
+      dashboardOverviewHistoryCache[granularity] = data.series || [];
+      if (granularity === 'week') populateWeeklyOverviewFilters(dashboardOverviewHistoryCache.week);
+      if (granularity === 'month') populateMonthlyOverviewFilter(dashboardOverviewHistoryCache.month);
+      if (granularity === 'day') populateDailyOverviewFilter(dashboardOverviewHistoryCache.day);
+      loadDashboardOverviewHistory('day');
+    } catch (error) {
+      console.error(`Error loading ${granularity} overview history:`, error);
+    }
+  }
+}
+
 function renderDashboardUI(data) {
   if (!data || !data.totals) return;
   const isEn = (typeof currentLanguage !== 'undefined' && currentLanguage === 'en');
+  const todayProfitMetrics = getProfitMetrics(data.totals);
 
   // 1. Primary Metrics
   const dashTodayBoxes = document.getElementById('dashTodayBoxes');
@@ -173,10 +396,22 @@ function renderDashboardUI(data) {
     dashTodayExpCount.textContent = `${data.totals.expenseCount || 0} ${isEn ? 'expenses recorded' : 'செலவு பதிவுகள்'}`;
   }
 
+  const dashTodayCommission = document.getElementById('dashTodayCommission');
+  if (dashTodayCommission) {
+    dashTodayCommission.textContent = formatINR(todayProfitMetrics.commissionAmount);
+    dashTodayCommission.style.color = todayProfitMetrics.commissionAmount >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
+  }
+
+  const dashTodayBaseProfit = document.getElementById('dashTodayBaseProfit');
+  if (dashTodayBaseProfit) {
+    dashTodayBaseProfit.textContent = formatINR(todayProfitMetrics.profitWithoutCommission);
+    dashTodayBaseProfit.style.color = todayProfitMetrics.profitWithoutCommission >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
+  }
+
   const dashTodayProfit = document.getElementById('dashTodayProfit');
   if (dashTodayProfit) {
-    dashTodayProfit.textContent = formatINR(data.totals.profit);
-    dashTodayProfit.style.color = data.totals.profit >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
+    dashTodayProfit.textContent = formatINR(todayProfitMetrics.totalProfit);
+    dashTodayProfit.style.color = todayProfitMetrics.totalProfit >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
   }
 
   const dashTodayMargin = document.getElementById('dashTodayMargin');
@@ -191,10 +426,14 @@ function renderDashboardUI(data) {
   if (dashCalcSalary) dashCalcSalary.textContent = formatINR(data.totals.salary);
   const dashCalcExpenses = document.getElementById('dashCalcExpenses');
   if (dashCalcExpenses) dashCalcExpenses.textContent = formatINR(data.totals.expenses);
+  const dashCalcBaseProfit = document.getElementById('dashCalcBaseProfit');
+  if (dashCalcBaseProfit) dashCalcBaseProfit.textContent = formatINR(todayProfitMetrics.profitWithoutCommission);
+  const dashCalcCommission = document.getElementById('dashCalcCommission');
+  if (dashCalcCommission) dashCalcCommission.textContent = formatINR(todayProfitMetrics.commissionAmount);
   const dashCalcProfit = document.getElementById('dashCalcProfit');
   if (dashCalcProfit) {
-    dashCalcProfit.textContent = formatINR(data.totals.profit);
-    dashCalcProfit.style.color = data.totals.profit >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
+    dashCalcProfit.textContent = formatINR(todayProfitMetrics.totalProfit);
+    dashCalcProfit.style.color = todayProfitMetrics.totalProfit >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
   }
 
   // 3. Comparative Growth Formatting in Numbers
@@ -219,7 +458,11 @@ function renderDashboardUI(data) {
     const deltaRate = g.deltaRate !== undefined ? g.deltaRate : g.rateDelta;
     const deltaSalary = g.deltaSalary !== undefined ? g.deltaSalary : g.salaryDelta;
     const deltaExpenses = g.deltaExpenses !== undefined ? g.deltaExpenses : g.expensesDelta;
-    const deltaProfit = g.deltaProfit !== undefined ? g.deltaProfit : g.profitDelta;
+    const currentComparisonProfit = getProfitMetrics(comp.current);
+    const previousComparisonProfit = getProfitMetrics(comp.previous);
+    const deltaBaseProfit = currentComparisonProfit.profitWithoutCommission - previousComparisonProfit.profitWithoutCommission;
+    const deltaCommission = currentComparisonProfit.commissionAmount - previousComparisonProfit.commissionAmount;
+    const deltaProfit = currentComparisonProfit.totalProfit - previousComparisonProfit.totalProfit;
 
     setBadge('compareBadgeBoxes', deltaBoxes, 'number', isEn ? 'Boxes' : 'கட்டை');
     setBadge('compareBadgeBeedis', deltaBeedis, 'number', 'Pcs');
@@ -228,6 +471,8 @@ function renderDashboardUI(data) {
     setBadge('compareBadgeRate', deltaRate, 'currency');
     setBadge('compareBadgeSalary', deltaSalary, 'currency');
     setBadge('compareBadgeExpenses', deltaExpenses, 'currency', '', true);
+    setBadge('compareBadgeBaseProfit', deltaBaseProfit, 'currency');
+    setBadge('compareBadgeCommission', deltaCommission, 'currency');
     setBadge('compareBadgeProfit', deltaProfit, 'currency');
   }
 
@@ -262,6 +507,7 @@ function renderDashboardUI(data) {
   if (weekData && weekData.current) {
     const wc = weekData.current;
     const wg = weekData.growth;
+    const weekProfitMetrics = getProfitMetrics(wc);
     const elWeekCuts = document.getElementById('dashWeekCuts');
     if (elWeekCuts) elWeekCuts.innerHTML = `${formatNumber(wc.boxes)} <span class="metric-unit">${isEn ? 'Boxes' : 'கட்டை'}</span>`;
     const elWeekBeedis = document.getElementById('dashWeekBeedis');
@@ -275,9 +521,15 @@ function renderDashboardUI(data) {
     if (elWeekExpenses) elWeekExpenses.textContent = formatINR(wc.expenses);
     const elWeekProfit = document.getElementById('dashWeekProfit');
     if (elWeekProfit) {
-      elWeekProfit.textContent = formatINR(wc.profit);
-      elWeekProfit.style.color = wc.profit >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
+      elWeekProfit.textContent = formatINR(weekProfitMetrics.totalProfit);
+      elWeekProfit.style.color = weekProfitMetrics.totalProfit >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
     }
+    const weekBaseProfit = document.getElementById('dashWeekBaseProfit');
+    if (weekBaseProfit) weekBaseProfit.textContent = formatINR(weekProfitMetrics.profitWithoutCommission);
+    const weekCommission = document.getElementById('dashWeekCommission');
+    if (weekCommission) weekCommission.textContent = formatINR(weekProfitMetrics.commissionAmount);
+    const weekTotalProfit = document.getElementById('dashWeekTotalProfit');
+    if (weekTotalProfit) weekTotalProfit.textContent = formatINR(weekProfitMetrics.totalProfit);
 
     const setOverviewBadge = (id, delta, type = 'number', unit = '', inv = false) => {
       const el = document.getElementById(id);
@@ -295,6 +547,7 @@ function renderDashboardUI(data) {
   if (monthData && monthData.current) {
     const mc = monthData.current;
     const mg = monthData.growth;
+    const monthProfitMetrics = getProfitMetrics(mc);
     const elMonthCuts = document.getElementById('dashMonthCuts');
     if (elMonthCuts) elMonthCuts.innerHTML = `${formatNumber(mc.boxes)} <span class="metric-unit">${isEn ? 'Boxes' : 'கட்டை'}</span>`;
     const elMonthBeedis = document.getElementById('dashMonthBeedis');
@@ -308,9 +561,15 @@ function renderDashboardUI(data) {
     if (elMonthExpenses) elMonthExpenses.textContent = formatINR(mc.expenses);
     const elMonthProfit = document.getElementById('dashMonthProfit');
     if (elMonthProfit) {
-      elMonthProfit.textContent = formatINR(mc.profit);
-      elMonthProfit.style.color = mc.profit >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
+      elMonthProfit.textContent = formatINR(monthProfitMetrics.totalProfit);
+      elMonthProfit.style.color = monthProfitMetrics.totalProfit >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
     }
+    const monthBaseProfit = document.getElementById('dashMonthBaseProfit');
+    if (monthBaseProfit) monthBaseProfit.textContent = formatINR(monthProfitMetrics.profitWithoutCommission);
+    const monthCommission = document.getElementById('dashMonthCommission');
+    if (monthCommission) monthCommission.textContent = formatINR(monthProfitMetrics.commissionAmount);
+    const monthTotalProfit = document.getElementById('dashMonthTotalProfit');
+    if (monthTotalProfit) monthTotalProfit.textContent = formatINR(monthProfitMetrics.totalProfit);
 
     const setOverviewBadge = (id, delta, type = 'number', unit = '', inv = false) => {
       const el = document.getElementById(id);
@@ -328,9 +587,11 @@ function renderDashboardUI(data) {
   const tbody = document.getElementById('dashSummaryTableBody');
   if (tbody && data.timeSeries) {
     if (data.timeSeries.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="10" style="text-align: center; color: var(--text-dim);">${isEn ? 'No records for this period' : 'இந்த காலக்கட்டத்தில் பதிவுகள் இல்லை'}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="12" style="text-align: center; color: var(--text-dim);">${isEn ? 'No records for this period' : 'இந்த காலக்கட்டத்தில் பதிவுகள் இல்லை'}</td></tr>`;
     } else {
-      tbody.innerHTML = data.timeSeries.map(row => `
+      tbody.innerHTML = data.timeSeries.map(row => {
+        const rowProfitMetrics = getProfitMetrics(row);
+        return `
         <tr>
           <td><strong>${row.displayDate || formatDate(row.date)}</strong></td>
           <td><span class="badge badge-accent">${row.boxes || 0} Boxes</span></td>
@@ -341,11 +602,12 @@ function renderDashboardUI(data) {
           <td>${formatINR(row.salary)}</td>
           <td><strong>${formatINR(row.rate)}</strong></td>
           <td>${formatINR(row.expenses)}</td>
-          <td style="font-weight: 700; color: ${(row.profit >= 0) ? 'var(--accent-green)' : 'var(--accent-red)'}">
-            ${formatINR(row.profit)}
-          </td>
+          <td>${formatINR(rowProfitMetrics.profitWithoutCommission)}</td>
+          <td>${formatINR(rowProfitMetrics.commissionAmount)}</td>
+          <td class="total-profit-cell" style="font-weight: 800; color: ${(rowProfitMetrics.totalProfit >= 0) ? 'var(--accent-green)' : 'var(--accent-red)'}">${formatINR(rowProfitMetrics.totalProfit)}</td>
         </tr>
-      `).join('');
+      `;
+      }).join('');
     }
   }
 }
@@ -470,14 +732,20 @@ function renderPeriodComparisonCard(data, period = currentComparisonPeriod) {
   const deltaRate = g.deltaRate !== undefined ? g.deltaRate : (g.rateDelta !== undefined ? g.rateDelta : (comp.current.rate - comp.previous.rate));
   const deltaSalary = g.deltaSalary !== undefined ? g.deltaSalary : (g.salaryDelta !== undefined ? g.salaryDelta : (comp.current.salary - comp.previous.salary));
   const deltaExpenses = g.deltaExpenses !== undefined ? g.deltaExpenses : (g.expensesDelta !== undefined ? g.expensesDelta : (comp.current.expenses - comp.previous.expenses));
-  const deltaProfit = g.deltaProfit !== undefined ? g.deltaProfit : (g.profitDelta !== undefined ? g.profitDelta : (comp.current.profit - comp.previous.profit));
+  const currentProfitMetrics = getProfitMetrics(comp.current);
+  const previousProfitMetrics = getProfitMetrics(comp.previous);
+  const deltaProfit = currentProfitMetrics.totalProfit - previousProfitMetrics.totalProfit;
+  const deltaBaseProfit = currentProfitMetrics.profitWithoutCommission - previousProfitMetrics.profitWithoutCommission;
+  const deltaCommission = currentProfitMetrics.commissionAmount - previousProfitMetrics.commissionAmount;
 
   updateCompItem('Boxes', comp.current.boxes, comp.previous.boxes, deltaBoxes, 'number', isEn ? 'Boxes' : 'கட்டை');
   updateCompItem('Beedis', comp.current.beedis, comp.previous.beedis, deltaBeedis, 'number', 'Pcs');
   updateCompItem('Rate', comp.current.rate, comp.previous.rate, deltaRate, 'currency');
   updateCompItem('Salary', comp.current.salary, comp.previous.salary, deltaSalary, 'currency');
   updateCompItem('Expenses', comp.current.expenses, comp.previous.expenses, deltaExpenses, 'currency', '', true);
-  updateCompItem('Profit', comp.current.profit, comp.previous.profit, deltaProfit, 'currency');
+  updateCompItem('Profit', currentProfitMetrics.totalProfit, previousProfitMetrics.totalProfit, deltaProfit, 'currency');
+  updateCompItem('BaseProfit', currentProfitMetrics.profitWithoutCommission, previousProfitMetrics.profitWithoutCommission, deltaBaseProfit, 'currency');
+  updateCompItem('Commission', currentProfitMetrics.commissionAmount, previousProfitMetrics.commissionAmount, deltaCommission, 'currency');
 }
 
 function switchDashboardBarChartFilter(type, granularity) {
@@ -759,6 +1027,8 @@ function renderDashboardProfitBarChart(data, granularity = dashProfitGranularity
   let rateData = [];
   let salaryData = [];
   let expenseData = [];
+  let baseProfitData = [];
+  let commissionData = [];
   let profitData = [];
 
   if (data && data.series) {
@@ -766,13 +1036,27 @@ function renderDashboardProfitBarChart(data, granularity = dashProfitGranularity
     rateData = data.series.map(row => row.prodRate || 0);
     salaryData = data.series.map(row => row.prodSalary || 0);
     expenseData = data.series.map(row => row.expenses || 0);
-    profitData = data.series.map(row => row.netProfit || 0);
+    const seriesProfitMetrics = data.series.map(row => getProfitMetrics({
+      rate: row.prodRate,
+      salary: row.prodSalary,
+      expenses: row.expenses,
+      beedis: row.prodBeedis,
+      profitWithoutCommission: row.profitWithoutCommission,
+      commissionAmount: row.commissionAmount,
+      totalProfit: row.totalProfit
+    }));
+    baseProfitData = seriesProfitMetrics.map(metrics => metrics.profitWithoutCommission);
+    commissionData = seriesProfitMetrics.map(metrics => metrics.commissionAmount);
+    profitData = seriesProfitMetrics.map(metrics => metrics.totalProfit);
   } else if (granularity === 'month' && data && data.monthlyHistory) {
     labels = data.monthlyHistory.map(m => m.label);
     rateData = data.monthlyHistory.map(m => m.rate || 0);
     salaryData = data.monthlyHistory.map(m => m.salary || 0);
     expenseData = data.monthlyHistory.map(m => m.expenses || 0);
-    profitData = data.monthlyHistory.map(m => m.profit || 0);
+    const monthlyProfitMetrics = data.monthlyHistory.map(m => getProfitMetrics(m));
+    baseProfitData = monthlyProfitMetrics.map(metrics => metrics.profitWithoutCommission);
+    commissionData = monthlyProfitMetrics.map(metrics => metrics.commissionAmount);
+    profitData = monthlyProfitMetrics.map(metrics => metrics.totalProfit);
   } else if (granularity === 'week') {
     const ts = (data && data.timeSeries) ? data.timeSeries : [];
     const weekBuckets = {};
@@ -782,17 +1066,22 @@ function renderDashboardProfitBarChart(data, granularity = dashProfitGranularity
       const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
       const k = `${mon.getFullYear()}-${String(mon.getMonth() + 1).padStart(2, '0')}-${String(mon.getDate()).padStart(2, '0')}`;
       const lbl = `${mon.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })} - ${sun.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}`;
-      if (!weekBuckets[k]) weekBuckets[k] = { label: lbl, rate: 0, salary: 0, expenses: 0, profit: 0 };
+      if (!weekBuckets[k]) weekBuckets[k] = { label: lbl, rate: 0, salary: 0, expenses: 0, baseProfit: 0, commission: 0, profit: 0 };
       weekBuckets[k].rate += (d.rate || 0);
       weekBuckets[k].salary += (d.salary || 0);
       weekBuckets[k].expenses += (d.expenses || 0);
-      weekBuckets[k].profit += (d.profit || 0);
+      const dayProfitMetrics = getProfitMetrics(d);
+      weekBuckets[k].baseProfit += dayProfitMetrics.profitWithoutCommission;
+      weekBuckets[k].commission += dayProfitMetrics.commissionAmount;
+      weekBuckets[k].profit += dayProfitMetrics.totalProfit;
     });
     const wkKeys = Object.keys(weekBuckets).sort().slice(-8);
     labels = wkKeys.map(k => weekBuckets[k].label);
     rateData = wkKeys.map(k => weekBuckets[k].rate);
     salaryData = wkKeys.map(k => weekBuckets[k].salary);
     expenseData = wkKeys.map(k => weekBuckets[k].expenses);
+    baseProfitData = wkKeys.map(k => weekBuckets[k].baseProfit);
+    commissionData = wkKeys.map(k => weekBuckets[k].commission);
     profitData = wkKeys.map(k => weekBuckets[k].profit);
   } else {
     const ts = (data && data.timeSeries) ? data.timeSeries.slice(-14) : [];
@@ -800,7 +1089,10 @@ function renderDashboardProfitBarChart(data, granularity = dashProfitGranularity
     rateData = ts.map(d => d.rate || 0);
     salaryData = ts.map(d => d.salary || 0);
     expenseData = ts.map(d => d.expenses || 0);
-    profitData = ts.map(d => d.profit || 0);
+    const dayProfitMetrics = ts.map(d => getProfitMetrics(d));
+    baseProfitData = dayProfitMetrics.map(metrics => metrics.profitWithoutCommission);
+    commissionData = dayProfitMetrics.map(metrics => metrics.commissionAmount);
+    profitData = dayProfitMetrics.map(metrics => metrics.totalProfit);
   }
 
   if (dashProfitChartInstance) dashProfitChartInstance.destroy();
@@ -832,7 +1124,21 @@ function renderDashboardProfitBarChart(data, granularity = dashProfitGranularity
           borderRadius: 6
         },
         {
-          label: isEn ? 'Net Profit (₹)' : 'நிகர லாபம் (₹)',
+          label: isEn ? 'Net Profit (No Commission) (₹)' : 'நிகர லாபம் (கமிஷன் இல்லை) (₹)',
+          data: baseProfitData,
+          backgroundColor: 'rgba(14, 116, 144, 0.85)',
+          hoverBackgroundColor: '#0e7490',
+          borderRadius: 6
+        },
+        {
+          label: isEn ? 'Commission (₹)' : 'கமிஷன் (₹)',
+          data: commissionData,
+          backgroundColor: 'rgba(124, 58, 237, 0.85)',
+          hoverBackgroundColor: '#7c3aed',
+          borderRadius: 6
+        },
+        {
+          label: isEn ? 'Total Profit (₹)' : 'மொத்த லாபம் (₹)',
           data: profitData,
           backgroundColor: profitData.map(v => v >= 0 ? 'rgba(5, 150, 105, 0.88)' : 'rgba(220, 38, 38, 0.88)'),
           hoverBackgroundColor: profitData.map(v => v >= 0 ? '#059669' : '#dc2626'),
@@ -933,6 +1239,9 @@ window.addEventListener('themeChanged', () => {
 
 window.addEventListener('languageChanged', () => {
   updateDashboardPeriodPills();
+  if (dashboardOverviewHistoryCache.week) populateWeeklyOverviewFilters(dashboardOverviewHistoryCache.week);
+  if (dashboardOverviewHistoryCache.month) populateMonthlyOverviewFilter(dashboardOverviewHistoryCache.month);
+    if (dashboardOverviewHistoryCache.day) populateDailyOverviewFilter(dashboardOverviewHistoryCache.day);
   if (cachedAnalytics) {
     renderDashboardUI(cachedAnalytics);
     renderDashboardCharts(cachedAnalytics);

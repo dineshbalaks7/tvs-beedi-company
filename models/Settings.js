@@ -43,6 +43,13 @@ const SettingsSchema = new mongoose.Schema({
     required: true,
     min: 0
   },
+  commissionPercent: {
+    type: Number,
+    default: 0.10,
+    required: true,
+    min: 0,
+    max: 1
+  },
   avgWastageKg: {
     type: Number,
     default: 2,

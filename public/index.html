@@ -135,15 +135,8 @@
             </div>
             <div class="metric-value" id="dashTodayRate">₹0</div>
             <div class="metric-sub" data-i18n="ratioRate">₹340 / 1,000 பீடி</div>
-          </div>
-          <div class="metric-card">
-            <div class="metric-card-top">
-              <span class="metric-label" id="metricLabelSalary" data-i18n="todaySalary">இன்றைய சம்பளம்</span>
-              <div class="dash-metric-compare" id="compareBadgeSalary"></div>
+              <div class="metric-sub" data-i18n="ratioSalary">₹320 / 1,000 பீடி</div>
             </div>
-            <div class="metric-value" id="dashTodaySalary">₹0</div>
-            <div class="metric-sub" data-i18n="ratioSalary">₹320 / 1,000 பீடி</div>
-          </div>
           <div class="metric-card">
             <div class="metric-card-top">
               <span class="metric-label" id="metricLabelExpenses" data-i18n="todayExpenses">இன்றைய செலவுகள்</span>
@@ -152,7 +145,23 @@
             <div class="metric-value" id="dashTodayExpenses">₹0</div>
             <div class="metric-sub" id="dashTodayExpCount">0 செலவு பதிவுகள்</div>
           </div>
-          <div class="metric-card highlight-profit">
+          <div class="metric-card">
+            <div class="metric-card-top">
+              <span class="metric-label" data-i18n="netProfitNoCommission">நிகர லாபம் (கமிஷன் இல்லை)</span>
+              <div class="dash-metric-compare" id="compareBadgeBaseProfit"></div>
+            </div>
+            <div class="metric-value" id="dashTodayBaseProfit">₹0</div>
+            <div class="metric-sub" data-i18n="noCommissionFormula">Rate − Salary − Expenses</div>
+          </div>
+          <div class="metric-card highlight-commission">
+            <div class="metric-card-top">
+              <span class="metric-label" data-i18n="todayCommission">இன்றைய கமிஷன்</span>
+              <div class="dash-metric-compare" id="compareBadgeCommission"></div>
+            </div>
+            <div class="metric-value" id="dashTodayCommission">₹0</div>
+            <div class="metric-sub" data-i18n="commissionBeedisHint">10% of beedis</div>
+          </div>
+          <div class="metric-card overall-profit">
             <div class="metric-card-top">
               <span class="metric-label" id="metricLabelProfit" data-i18n="todayProfit">இன்றைய நிகர லாபம்</span>
               <div class="dash-metric-compare" id="compareBadgeProfit"></div>
@@ -182,7 +191,17 @@
             </div>
             <div class="formula-sign">=</div>
             <div class="formula-step">
-              <div class="formula-title" data-i18n="todayProfit">நிகர லாபம்</div>
+              <div class="formula-title" data-i18n="profitFormulaNetProfitNoCommission">Net Profit (No Commission)</div>
+              <div class="formula-val" id="dashCalcBaseProfit">₹0</div>
+            </div>
+            <div class="formula-sign">+</div>
+            <div class="formula-step">
+              <div class="formula-title" data-i18n="profitFormulaCommission">Commission</div>
+              <div class="formula-val" id="dashCalcCommission">₹0</div>
+            </div>
+            <div class="formula-sign">=</div>
+            <div class="formula-step">
+              <div class="formula-title" data-i18n="profitFormulaTotalProfit">Total Profit</div>
               <div class="formula-val" style="color: var(--accent-green);" id="dashCalcProfit">₹0</div>
             </div>
           </div>
@@ -309,9 +328,9 @@
               <div class="comp-delta-text" id="compDeltaExpenses">Δ ₹0</div>
             </div>
 
-            <div class="comp-item highlight-profit">
+            <div class="comp-item overall-profit">
               <div class="comp-item-header">
-                <span class="comp-metric-name" data-i18n="netProfitDisplay">நிகர லாபம்</span>
+                <span class="comp-metric-name" data-i18n="profitFormulaTotalProfit">மொத்த லாபம்</span>
                 <span class="comp-growth-pill" id="compGrowthProfit">+₹0</span>
               </div>
               <div class="comp-values-row">
@@ -326,6 +345,17 @@
                 </div>
               </div>
               <div class="comp-delta-text" id="compDeltaProfit">Δ ₹0</div>
+            </div>
+
+            <div class="comp-item">
+              <div class="comp-item-header"><span class="comp-metric-name" data-i18n="netProfitNoCommission">Net Profit (No Commission)</span><span class="comp-growth-pill" id="compGrowthBaseProfit">+₹0</span></div>
+              <div class="comp-values-row"><div class="comp-col"><span class="comp-col-label comp-label-current">Current</span><span class="comp-val current" id="compCurBaseProfit">₹0</span></div><div class="comp-divider">vs</div><div class="comp-col"><span class="comp-col-label comp-label-previous">Previous</span><span class="comp-val prev" id="compPrevBaseProfit">₹0</span></div></div>
+              <div class="comp-delta-text" id="compDeltaBaseProfit">Δ ₹0</div>
+            </div>
+            <div class="comp-item highlight-commission">
+              <div class="comp-item-header"><span class="comp-metric-name" data-i18n="todayCommission">Commission</span><span class="comp-growth-pill" id="compGrowthCommission">+₹0</span></div>
+              <div class="comp-values-row"><div class="comp-col"><span class="comp-col-label comp-label-current">Current</span><span class="comp-val current" id="compCurCommission">₹0</span></div><div class="comp-divider">vs</div><div class="comp-col"><span class="comp-col-label comp-label-previous">Previous</span><span class="comp-val prev" id="compPrevCommission">₹0</span></div></div>
+              <div class="comp-delta-text" id="compDeltaCommission">Δ ₹0</div>
             </div>
           </div>
         </div>
@@ -414,11 +444,13 @@
                   <th data-i18n="colSalary">சம்பளம்</th>
                   <th data-i18n="colRate">Rate</th>
                   <th data-i18n="colExpenses">செலவுகள்</th>
-                  <th data-i18n="colProfit">லாபம்</th>
+                  <th data-i18n="netProfitNoCommission">Net Profit (No Commission)</th>
+                  <th data-i18n="todayCommission">Commission</th>
+                  <th data-i18n="profitFormulaTotalProfit">Total Profit</th>
                 </tr>
               </thead>
               <tbody id="dashSummaryTableBody">
-                <tr><td colspan="10" style="text-align:center;" data-i18n="loading">ஏற்றப்படுகிறது...</td></tr>
+                <tr><td colspan="12" style="text-align:center;" data-i18n="loading">ஏற்றப்படுகிறது...</td></tr>
               </tbody>
             </table>
           </div>
@@ -451,9 +483,13 @@
               <h3 class="card-title">📆 <span data-i18n="weeklyOverviewTitle">இந்த வார நிலவரம் (Weekly Wise Overview)</span></h3>
               <p class="section-subtitle" data-i18n="weeklyOverviewSub" style="margin-top: 4px; margin-bottom: 0;">கடந்த 7 நாட்கள் vs முந்தைய 7 நாட்கள் ஒப்பீடு</p>
             </div>
-            <button class="btn-secondary" onclick="setDashboardPeriod('week')">
-              <span>📆</span> <span data-i18n="viewWeeklyDetails">வாராந்திர விவரம்</span>
-            </button>
+            <div class="overview-filter-controls">
+              <label class="overview-filter-label"><span data-i18n="overviewMonthFilter">மாதம்</span><select id="dashWeekMonthFilter" class="form-input overview-filter" onchange="filterWeeklyOverviewMonth(this.value)"></select></label>
+              <label class="overview-filter-label"><span data-i18n="overviewWeekFilter">வாரம்</span><select id="dashWeekFilter" class="form-input overview-filter" onchange="filterWeeklyOverviewWeek(this.value)"></select></label>
+              <button class="btn-secondary" onclick="setDashboardPeriod('week')">
+                <span>📆</span> <span data-i18n="viewWeeklyDetails">வாராந்திர விவரம்</span>
+              </button>
+            </div>
           </div>
           <div class="metrics-grid">
             <div class="metric-card">
@@ -476,13 +512,9 @@
               <span class="metric-label" data-i18n="weekExpenses">வார செலவுகள்</span>
               <div class="metric-value" id="dashWeekExpenses">₹0</div>
             </div>
-            <div class="metric-card highlight-profit">
-              <div class="metric-card-top">
-                <span class="metric-label" data-i18n="weekProfit">வார நிகர லாபம்</span>
-                <span class="dash-metric-compare" id="dashWeekProfitGrowth">+₹0</span>
-              </div>
-              <div class="metric-value" id="dashWeekProfit">₹0</div>
-            </div>
+            <div class="metric-card"><span class="metric-label" data-i18n="netProfitNoCommission">Net Profit (No Commission)</span><div class="metric-value" id="dashWeekBaseProfit">₹0</div></div>
+            <div class="metric-card highlight-commission"><span class="metric-label" data-i18n="weeklyCommission">வார கமிஷன்</span><div class="metric-value" id="dashWeekCommission">₹0</div></div>
+            <div class="metric-card overall-profit"><span class="metric-label" data-i18n="profitFormulaTotalProfit">Total Profit</span><div class="metric-value" id="dashWeekTotalProfit">₹0</div></div>
           </div>
         </div>
 
@@ -493,9 +525,12 @@
               <h3 class="card-title">📊 <span data-i18n="monthlyOverviewTitle">இந்த மாத நிலவரம் (Monthly Wise Overview)</span></h3>
               <p class="section-subtitle" data-i18n="monthlyOverviewSub" style="margin-top: 4px; margin-bottom: 0;">நடப்பு மாதம் vs முந்தைய மாதம் ஒப்பீடு</p>
             </div>
-            <button class="btn-secondary" onclick="setDashboardPeriod('month')">
-              <span>📊</span> <span data-i18n="viewMonthlyDetails">மாதாந்திர விவரம்</span>
-            </button>
+            <div class="overview-filter-controls">
+              <label class="overview-filter-label"><span data-i18n="overviewMonthFilter">மாதம்</span><select id="dashMonthFilter" class="form-input overview-filter" onchange="filterMonthlyOverview(this.value)"></select></label>
+              <button class="btn-secondary" onclick="setDashboardPeriod('month')">
+                <span>📊</span> <span data-i18n="viewMonthlyDetails">மாதாந்திர விவரம்</span>
+              </button>
+            </div>
           </div>
           <div class="metrics-grid">
             <div class="metric-card">
@@ -518,13 +553,38 @@
               <span class="metric-label" data-i18n="monthExpenses">மாத செலவுகள்</span>
               <div class="metric-value" id="dashMonthExpenses">₹0</div>
             </div>
-            <div class="metric-card highlight-profit">
-              <div class="metric-card-top">
-                <span class="metric-label" data-i18n="monthProfit">மாத நிகர லாபம்</span>
-                <span class="dash-metric-compare" id="dashMonthProfitGrowth">+₹0</span>
-              </div>
-              <div class="metric-value" id="dashMonthProfit">₹0</div>
+            <div class="metric-card"><span class="metric-label" data-i18n="netProfitNoCommission">Net Profit (No Commission)</span><div class="metric-value" id="dashMonthBaseProfit">₹0</div></div>
+            <div class="metric-card highlight-commission"><span class="metric-label" data-i18n="monthlyCommission">மாத கமிஷன்</span><div class="metric-value" id="dashMonthCommission">₹0</div></div>
+            <div class="metric-card overall-profit"><span class="metric-label" data-i18n="profitFormulaTotalProfit">Total Profit</span><div class="metric-value" id="dashMonthTotalProfit">₹0</div></div>
+          </div>
+        </div>
+
+        <!-- Daily Overview Card -->
+        <div class="card" id="dashDailyOverviewCard">
+          <div class="card-title-row">
+            <div>
+              <h3 class="card-title">📅 <span data-i18n="dailyOverviewTitle">தினசரி செயல்திறன் நிலவரம் (Daily Performance Overview)</span></h3>
+              <p class="section-subtitle" data-i18n="dailyOverviewSub" style="margin-top: 4px; margin-bottom: 0;">தேர்ந்தெடுக்கப்பட்ட தினத்தின் உற்பத்தி மற்றும் நிதி நிலவரம்</p>
             </div>
+            <div class="overview-filter-controls">
+              <label class="overview-filter-label"><span data-i18n="overviewDateFilter">தேதி</span><input type="date" id="dashDayFilter" class="form-input overview-filter" onchange="filterDailyOverview(this.value)"></label>
+              <button class="btn-secondary" onclick="setDashboardPeriod('day')">
+                <span>📅</span> <span data-i18n="viewDailyDetails">தினசரி விவரம்</span>
+              </button>
+            </div>
+          </div>
+          <div class="metrics-grid">
+            <div class="metric-card">
+              <span class="metric-label" data-i18n="dayBoxes">தினசரி கட்டை (Boxes)</span>
+              <div class="metric-value" id="dashDayCuts">0 <span class="metric-unit">Boxes</span></div>
+              <div class="metric-sub" id="dashDayBeedis">0 பீடிகள் (0 Cuts)</div>
+            </div>
+            <div class="metric-card highlight-rate"><span class="metric-label" data-i18n="todayRate">தினசரி Rate மதிப்பு</span><div class="metric-value" id="dashDayRate">₹0</div></div>
+            <div class="metric-card"><span class="metric-label" data-i18n="todaySalary">தினசரி சம்பளம்</span><div class="metric-value" id="dashDaySalary">₹0</div></div>
+            <div class="metric-card"><span class="metric-label" data-i18n="todayExpenses">தினசரி செலவுகள்</span><div class="metric-value" id="dashDayExpenses">₹0</div></div>
+            <div class="metric-card"><span class="metric-label" data-i18n="netProfitNoCommission">Net Profit (No Commission)</span><div class="metric-value" id="dashDayBaseProfit">₹0</div></div>
+            <div class="metric-card highlight-commission"><span class="metric-label" data-i18n="commissionLabel">Commission</span><div class="metric-value" id="dashDayCommission">₹0</div></div>
+            <div class="metric-card overall-profit"><span class="metric-label" data-i18n="profitFormulaTotalProfit">Total Profit</span><div class="metric-value" id="dashDayProfit">₹0</div></div>
           </div>
         </div>
       </section>

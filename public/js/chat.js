@@ -207,7 +207,7 @@ function showTypingIndicator() {
   const bubble = document.createElement('div');
   bubble.id = id;
   bubble.className = 'chat-bubble assistant';
-  bubble.innerHTML = '<span style="color: var(--accent-amber);">● ● ●</span>';
+  bubble.innerHTML = '<span class="chat-typing-indicator" aria-label="Assistant is typing"><span></span><span></span><span></span></span>';
   chatMessages.appendChild(bubble);
   chatMessages.scrollTop = chatMessages.scrollHeight;
   return id;

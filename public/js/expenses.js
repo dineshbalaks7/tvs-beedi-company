@@ -78,7 +78,7 @@ async function loadExpensesData() {
 
 async function deleteExpense(id) {
   const isEn = (typeof currentLanguage !== 'undefined' && currentLanguage === 'en');
-  if (!confirm(isEn ? 'Are you sure you want to delete this expense?' : 'இந்த செலவு பதிவை நீக்க விரும்புகிறீர்களா?')) return;
+  if (!await showConfirmDialog(isEn ? 'Are you sure you want to delete this expense?' : 'இந்த செலவு பதிவை நீக்க விரும்புகிறீர்களா?')) return;
 
   try {
     const res = await fetch(`/api/expenses/${id}`, { method: 'DELETE' });

@@ -6,6 +6,188 @@
 let cachedExports = null;
 let exportFilterMode = 'all';
 let currentDuplicateExportRecord = null;
+let includeExportCommission = true;
+let exportSummaryPeriod = 'day';
+
+function toISODate(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function getSummaryMonthValue() {
+  const today = new Date();
+  return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function selectExportSummaryDay(offset) {
+  if (exportSummaryPeriod !== 'day') return;
+  const selectedDate = new Date();
+  selectedDate.setDate(selectedDate.getDate() + Number(offset || 0));
+  const dateInput = document.getElementById('exportSummaryDate');
+  const yesterdayButton = document.getElementById('exportSummaryYesterday');
+  if (yesterdayButton) {
+    yesterdayButton.classList.remove('summary-filter-clicked');
+    void yesterdayButton.offsetWidth;
+    yesterdayButton.classList.add('summary-filter-clicked');
+  }
+  if (dateInput) dateInput.value = toISODate(selectedDate);
+  applyExportSummarySelection();
+}
+
+function getSummaryMonthOptions() {
+  const currentYear = new Date().getFullYear();
+  const years = new Set([currentYear]);
+  (cachedExports?.exports || []).forEach(record => {
+    const date = new Date(record.date);
+    if (!Number.isNaN(date.getTime())) years.add(date.getFullYear());
+  });
+
+  const isEn = typeof currentLanguage !== 'undefined' && currentLanguage === 'en';
+  return [...years].sort().flatMap(year => Array.from({ length: 12 }, (_, index) => {
+    const month = String(index + 1).padStart(2, '0');
+    const value = `${year}-${month}`;
+    const label = new Date(year, index, 1).toLocaleDateString(isEn ? 'en-US' : 'en-IN', { month: 'long', year: 'numeric' });
+    return `<option value="${value}">${label}</option>`;
+  })).join('');
+}
+
+function populateSummaryWeekOptions(monthValue) {
+  const weekSelect = document.getElementById('exportSummaryWeek');
+  if (!weekSelect) return;
+  const previousValue = weekSelect.value;
+  const [year, month] = monthValue.split('-').map(Number);
+  const lastDay = new Date(year, month, 0).getDate();
+  const isEn = typeof currentLanguage !== 'undefined' && currentLanguage === 'en';
+  weekSelect.innerHTML = Array.from({ length: Math.ceil(lastDay / 7) }, (_, index) => {
+    const week = index + 1;
+    const startDay = index * 7 + 1;
+    const endDay = Math.min(startDay + 6, lastDay);
+    const from = toISODate(new Date(year, month - 1, startDay));
+    const to = toISODate(new Date(year, month - 1, endDay));
+    const label = isEn ? `Week ${week} (${from} to ${to})` : `வாரம் ${week} (${from} முதல் ${to} வரை)`;
+    return `<option value="${from}|${to}">${label}</option>`;
+  }).join('');
+  if ([...weekSelect.options].some(option => option.value === previousValue)) {
+    weekSelect.value = previousValue;
+  } else {
+    weekSelect.selectedIndex = 0;
+  }
+}
+
+function updateSummarySelectionControls() {
+  const dateInput = document.getElementById('exportSummaryDate');
+  const yesterdayButton = document.getElementById('exportSummaryYesterday');
+  const weekSelect = document.getElementById('exportSummaryWeek');
+  const monthSelect = document.getElementById('exportSummaryMonth');
+  if (!dateInput || !weekSelect || !monthSelect) return;
+
+  const currentMonth = getSummaryMonthValue();
+  if (!dateInput.value) dateInput.value = getTodayISODate();
+  if (!monthSelect.options.length) monthSelect.innerHTML = getSummaryMonthOptions();
+  if (!monthSelect.value) monthSelect.value = currentMonth;
+  populateSummaryWeekOptions(monthSelect.value || currentMonth);
+  if (!weekSelect.value) weekSelect.selectedIndex = 0;
+
+  dateInput.style.display = exportSummaryPeriod === 'day' ? 'block' : 'none';
+  if (yesterdayButton) yesterdayButton.style.display = exportSummaryPeriod === 'day' ? 'inline-flex' : 'none';
+  weekSelect.style.display = exportSummaryPeriod === 'week' ? 'block' : 'none';
+  monthSelect.style.display = ['week', 'month'].includes(exportSummaryPeriod) ? 'block' : 'none';
+}
+
+function getSummarySelectionRange() {
+  const dateInput = document.getElementById('exportSummaryDate');
+  const weekSelect = document.getElementById('exportSummaryWeek');
+  const monthSelect = document.getElementById('exportSummaryMonth');
+
+  if (exportSummaryPeriod === 'day') {
+    const date = dateInput?.value || getTodayISODate();
+    return { from: date, to: date };
+  }
+  if (exportSummaryPeriod === 'week') {
+    const [from, to] = (weekSelect?.value || '').split('|');
+    return { from, to };
+  }
+  const [year, month] = (monthSelect?.value || getSummaryMonthValue()).split('-').map(Number);
+  const lastDay = new Date(year, month, 0).getDate();
+  return {
+    from: `${year}-${String(month).padStart(2, '0')}-01`,
+    to: `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
+  };
+}
+
+function applyExportSummarySelection() {
+  const monthSelect = document.getElementById('exportSummaryMonth');
+  const dateInput = document.getElementById('exportSummaryDate');
+  const yesterdayButton = document.getElementById('exportSummaryYesterday');
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  if (yesterdayButton && dateInput && dateInput.value !== toISODate(yesterday)) {
+    yesterdayButton.classList.remove('summary-filter-clicked');
+  }
+  if (exportSummaryPeriod === 'week' && monthSelect) {
+    populateSummaryWeekOptions(monthSelect.value || getSummaryMonthValue());
+  }
+  const { from, to } = getSummarySelectionRange();
+  if (!from || !to) return;
+
+  const url = `/api/export?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&_=${Date.now()}`;
+  fetch(url, { cache: 'no-store' })
+    .then(response => {
+      if (!response.ok) throw new Error('Failed to load export summary');
+      return response.json();
+    })
+    .then(data => renderExportUI(data, true))
+    .catch(error => console.error('Error loading export summary:', error));
+}
+
+function setExportSummaryFilter(period, button) {
+  if (!['day', 'week', 'month'].includes(period)) return;
+  exportSummaryPeriod = period;
+  if (period !== 'day') {
+    const yesterdayButton = document.getElementById('exportSummaryYesterday');
+    if (yesterdayButton) yesterdayButton.classList.remove('summary-filter-clicked');
+  }
+  document.querySelectorAll('#exportSummaryFilterGroup .chart-filter-btn').forEach(item => item.classList.remove('active'));
+  if (button) button.classList.add('active');
+  updateSummarySelectionControls();
+
+  if (period === 'week' || period === 'month') {
+    const monthSelect = document.getElementById('exportSummaryMonth');
+    const currentMonth = getSummaryMonthValue();
+    if (monthSelect) monthSelect.value = currentMonth;
+    populateSummaryWeekOptions(currentMonth);
+
+    if (period === 'week') {
+      const weekSelect = document.getElementById('exportSummaryWeek');
+      const currentWeekIndex = Math.floor((new Date().getDate() - 1) / 7);
+      if (weekSelect) weekSelect.selectedIndex = currentWeekIndex;
+    }
+    updateSummarySelectionControls();
+  }
+
+  applyExportSummarySelection();
+}
+
+function toggleExportCommission(include) {
+  includeExportCommission = Boolean(include);
+  const table = document.getElementById('exportHistoryTable');
+  if (table) table.classList.toggle('commission-excluded', !includeExportCommission);
+  if (cachedExports) renderExportUI(cachedExports);
+}
+
+function getExportProfitMetrics(record, includeCommission = includeExportCommission) {
+  const rate = Number(record.rate || 0);
+  const salary = Number(record.salary || 0);
+  const beedis = Number(record.beedis || 0);
+  const profitWithoutCommission = rate - salary;
+  const commissionAmount = includeCommission
+    ? (beedis * (window.appSettings?.commissionPercent ?? 0.10) / 1000) * (window.appSettings?.ratePer1000 || 340)
+    : 0;
+  return {
+    profitWithoutCommission,
+    commissionAmount,
+    totalProfit: profitWithoutCommission + commissionAmount
+  };
+}
 
 function setExportFilter(mode, btn) {
   exportFilterMode = mode;
@@ -74,7 +256,9 @@ function handleExportBoxesInput(val) {
   const beedis = Math.round(boxes * beedisPerBox);
   const salary = (beedis / 1000) * salaryPer1000;
   const rate = (beedis / 1000) * ratePer1000;
-  const margin = rate - salary;
+  const profitWithoutCommission = rate - salary;
+  const commission = includeExportCommission ? (beedis * (window.appSettings?.commissionPercent ?? 0.10) / 1000) * ratePer1000 : 0;
+  const totalProfit = profitWithoutCommission + commission;
 
   const elBoxes = document.getElementById('prevExpBoxes');
   if (elBoxes) elBoxes.textContent = formatNumber(boxes);
@@ -87,7 +271,13 @@ function handleExportBoxesInput(val) {
   const elSalary = document.getElementById('prevExpSalary');
   if (elSalary) elSalary.textContent = formatINR(salary);
   const elMargin = document.getElementById('prevExpMargin');
-  if (elMargin) elMargin.textContent = formatINR(margin);
+  if (elMargin) elMargin.textContent = formatINR(totalProfit);
+  const elBaseProfit = document.getElementById('prevExpProfitWithoutCommission');
+  if (elBaseProfit) elBaseProfit.textContent = formatINR(profitWithoutCommission);
+  const elCommission = document.getElementById('prevExpCommission');
+  if (elCommission) elCommission.textContent = formatINR(commission);
+  const elTotalProfit = document.getElementById('prevExpTotalProfit');
+  if (elTotalProfit) elTotalProfit.textContent = formatINR(totalProfit);
 
   // Live stock limit validation
   const available = getAvailableStockForExport();
@@ -351,19 +541,33 @@ async function handleExportSubmit(event) {
   }
 }
 
-function renderExportUI(data) {
+function renderExportUI(data, summaryOnly = false) {
   if (!data || !data.totals) return;
   const isEn = (typeof currentLanguage !== 'undefined' && currentLanguage === 'en');
 
   // Metric Cards
+  const todayKey = getTodayISODate();
+  const todayExports = (data.exports || []).filter(record => getExportRecordISODate(record.date) === todayKey);
+  const todayBoxesFromRecords = todayExports.reduce((sum, record) => sum + (record.boxes || ((record.cuts || 0) / 300)), 0);
+  const selectedPeriodBoxes = (data.exports || []).reduce((sum, record) => sum + (record.boxes || ((record.cuts || 0) / 300)), 0);
+  const periodBoxes = exportSummaryPeriod === 'all' ? todayBoxesFromRecords : selectedPeriodBoxes;
+  const periodLabelEl = document.getElementById('exportPeriodMetricLabel');
+  if (periodLabelEl) {
+    const periodLabels = {
+      day: isEn ? "Today's Export" : 'இன்றைய ஏற்றுமதி',
+      week: isEn ? "This Week's Export" : 'இந்த வார ஏற்றுமதி',
+      month: isEn ? "This Month's Export" : 'இந்த மாத ஏற்றுமதி'
+    };
+    periodLabelEl.textContent = periodLabels[exportSummaryPeriod] || (isEn ? "Today's Export" : 'இன்றைய ஏற்றுமதி');
+  }
   const expTodayBoxesEl = document.getElementById('expTodayBoxes');
   if (expTodayBoxesEl) {
-    expTodayBoxesEl.innerHTML = `${formatNumber(data.totals.todayBoxes || 0)} <span class="metric-unit">${isEn ? 'Boxes' : 'கட்டை'}</span>`;
+    expTodayBoxesEl.innerHTML = `${formatNumber(periodBoxes)} <span class="metric-unit">${isEn ? 'Boxes' : 'கட்டை'}</span>`;
   }
   const expTodayBeedisEl = document.getElementById('expTodayBeedis');
   if (expTodayBeedisEl) {
-    const todayBeedis = (data.totals.todayBoxes || 0) * (window.appSettings?.beedisPerBox || 6000);
-    expTodayBeedisEl.textContent = `${formatNumber(todayBeedis)} ${isEn ? 'Beedis' : 'பீடிகள்'}`;
+    const periodBeedis = (data.exports || []).reduce((sum, record) => sum + (record.beedis || 0), 0);
+    expTodayBeedisEl.textContent = `${formatNumber(exportSummaryPeriod === 'all' ? todayBoxesFromRecords * (window.appSettings?.beedisPerBox || 6000) : periodBeedis)} ${isEn ? 'Beedis' : 'பீடிகள்'}`;
   }
 
   const expTotalBoxesEl = document.getElementById('expTotalBoxes');
@@ -379,7 +583,24 @@ function renderExportUI(data) {
   if (expTotalRateEl) expTotalRateEl.textContent = formatINR(data.totals.rate);
 
   const expTotalProfitEl = document.getElementById('expTotalProfit');
-  if (expTotalProfitEl) expTotalProfitEl.textContent = `${isEn ? 'Margin' : 'வித்தியாசம்'}: ${formatINR(data.totals.profit)}`;
+  if (expTotalProfitEl) expTotalProfitEl.textContent = `${isEn ? 'Total Profit' : 'மொத்த லாபம்'}: ${formatINR(data.totals.totalProfit ?? data.totals.profit)}`;
+  const exportProfitMetrics = getExportProfitMetrics({
+    rate: data.totals.rate,
+    salary: data.totals.salary,
+    beedis: data.totals.beedis
+  });
+  const exportProfitWithoutCommission = exportProfitMetrics.profitWithoutCommission;
+  const exportCommission = exportProfitMetrics.commissionAmount;
+  const exportTotalProfit = exportProfitMetrics.totalProfit;
+  const expProfitWithoutCommissionEl = document.getElementById('expProfitWithoutCommission');
+  if (expProfitWithoutCommissionEl) expProfitWithoutCommissionEl.textContent = formatINR(exportProfitWithoutCommission);
+  const expCommissionEl = document.getElementById('expCommission');
+  if (expCommissionEl) expCommissionEl.textContent = formatINR(exportCommission);
+  const expTotalProfitValueEl = document.getElementById('expTotalProfitValue');
+  if (expTotalProfitValueEl) {
+    expTotalProfitValueEl.textContent = formatINR(exportTotalProfit);
+    expTotalProfitValueEl.style.color = exportTotalProfit >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
+  }
 
   const expPackedStockEl = document.getElementById('expPackedStock');
   if (expPackedStockEl) {
@@ -397,16 +618,19 @@ function renderExportUI(data) {
     expAvailBadgeVal.textContent = formatNumber(getAvailableStockForExport());
   }
 
+  if (summaryOnly) return;
+
   // History Table
   const tbody = document.getElementById('exportTableBody');
   if (tbody && data.exports) {
     if (data.exports.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color: var(--text-dim);">${isEn ? 'No export records found' : 'ஏற்றுமதி பதிவுகள் எதுவும் இல்லை'}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="10" style="text-align:center; color: var(--text-dim);">${isEn ? 'No export records found' : 'ஏற்றுமதி பதிவுகள் எதுவும் இல்லை'}</td></tr>`;
       return;
     }
 
     tbody.innerHTML = data.exports.map(p => {
       const boxes = p.boxes !== undefined ? p.boxes : Number(((p.cuts || 0) / 300).toFixed(1));
+      const profitMetrics = getExportProfitMetrics(p);
       return `
         <tr>
           <td><strong>${formatDate(p.date)}</strong></td>
@@ -414,6 +638,9 @@ function renderExportUI(data) {
           <td>${formatNumber(p.cuts)} ${isEn ? 'Cuts' : 'கட்டுகள்'}</td>
           <td>${formatNumber(p.beedis)}</td>
           <td style="color: var(--accent-gold); font-weight: 700;">${formatINR(p.rate)}</td>
+          <td class="export-profit-base">${formatINR(profitMetrics.profitWithoutCommission)}</td>
+          <td class="export-commission">${formatINR(profitMetrics.commissionAmount)}</td>
+          <td class="export-total-profit" style="color: var(--accent-green, #059669); font-weight: 700;">${formatINR(profitMetrics.totalProfit)}</td>
           <td><span style="color: var(--text-main); font-weight: 500;">${p.companyName || 'TVS Beedi Company'}</span></td>
           <td>
             <div class="table-actions-cell">
@@ -424,6 +651,8 @@ function renderExportUI(data) {
         </tr>
       `;
     }).join('');
+    const table = document.getElementById('exportHistoryTable');
+    if (table) table.classList.toggle('commission-excluded', !includeExportCommission);
   }
 }
 
@@ -435,13 +664,14 @@ async function loadExportData(from = '', to = '') {
     if (to) params.append('to', to);
     if (params.toString()) url += '?' + params.toString();
 
-    const res = await fetch(url);
+    const res = await fetch(`${url}${url.includes('?') ? '&' : '?'}_=${Date.now()}`, { cache: 'no-store' });
     const data = await res.json();
     if (!data || !data.totals) return;
 
     cachedExports = data;
     renderExportUI(data);
     renderExportBarChart(currentExportChartGranularity);
+    applyExportSummarySelection();
   } catch (err) {
     console.error('Error loading export data:', err);
   }
@@ -449,7 +679,7 @@ async function loadExportData(from = '', to = '') {
 
 async function deleteExport(id) {
   const isEn = (typeof currentLanguage !== 'undefined' && currentLanguage === 'en');
-  if (!confirm(isEn ? 'Are you sure you want to delete this export record?' : 'இந்த ஏற்றுமதி பதிவை நீக்க விரும்புகிறீர்களா?')) return;
+  if (!await showConfirmDialog(isEn ? 'Are you sure you want to delete this export record?' : 'இந்த ஏற்றுமதி பதிவை நீக்க விரும்புகிறீர்களா?')) return;
 
   try {
     const res = await fetch(`/api/export/${id}`, { method: 'DELETE' });
@@ -516,7 +746,7 @@ function getExportMonthNames(monthKey) {
   return { y, m, monthNameTa, monthNameEn };
 }
 
-function groupExportRecordsByMonth(records, from, to) {
+function groupExportRecordsByMonth(records, from, to, includeCommission = includeExportCommission) {
   const cutsPerBox = window.appSettings?.cutsPerBox || 300;
   const beedisPerBox = window.appSettings?.beedisPerBox || 6000;
 
@@ -525,6 +755,9 @@ function groupExportRecordsByMonth(records, from, to) {
   let completeTotalCuts = 0;
   let completeTotalBeedis = 0;
   let completeTotalRate = 0;
+  let completeProfitWithoutCommission = 0;
+  let completeCommission = 0;
+  let completeTotalProfit = 0;
 
   records.forEach(p => {
     const dateStr = getExportRecordISODate(p.date);
@@ -537,7 +770,10 @@ function groupExportRecordsByMonth(records, from, to) {
         totalBoxes: 0,
         totalCuts: 0,
         totalBeedis: 0,
-        totalRate: 0
+        totalRate: 0,
+        profitWithoutCommission: 0,
+        commission: 0,
+        totalProfit: 0
       };
     }
 
@@ -554,6 +790,7 @@ function groupExportRecordsByMonth(records, from, to) {
     const rate = (p.rate !== undefined && p.rate !== null && p.rate > 0)
       ? Number(p.rate)
       : Math.round(boxes * beedisPerBox);
+    const profitMetrics = getExportProfitMetrics({ ...p, rate, beedis }, includeCommission);
 
     monthGroups[monthKey].records.push({
       ...p,
@@ -561,13 +798,19 @@ function groupExportRecordsByMonth(records, from, to) {
       boxes,
       cuts,
       beedis,
-      rate
+      rate,
+      profitWithoutCommission: profitMetrics.profitWithoutCommission,
+      commission: profitMetrics.commissionAmount,
+      totalProfit: profitMetrics.totalProfit
     });
 
     monthGroups[monthKey].totalBoxes += boxes;
     monthGroups[monthKey].totalCuts += cuts;
     monthGroups[monthKey].totalBeedis += beedis;
     monthGroups[monthKey].totalRate += rate;
+    monthGroups[monthKey].profitWithoutCommission += profitMetrics.profitWithoutCommission;
+    monthGroups[monthKey].commission += profitMetrics.commissionAmount;
+    monthGroups[monthKey].totalProfit += profitMetrics.totalProfit;
   });
 
   const sortedMonthKeys = Object.keys(monthGroups).sort();
@@ -578,6 +821,9 @@ function groupExportRecordsByMonth(records, from, to) {
     completeTotalCuts += g.totalCuts;
     completeTotalBeedis += g.totalBeedis;
     completeTotalRate += g.totalRate;
+    completeProfitWithoutCommission += g.profitWithoutCommission;
+    completeCommission += g.commission;
+    completeTotalProfit += g.totalProfit;
   });
 
   completeTotalBoxes = Math.round(completeTotalBoxes * 10) / 10;
@@ -585,6 +831,7 @@ function groupExportRecordsByMonth(records, from, to) {
   return {
     from,
     to,
+    includeCommission,
     records,
     sortedMonthKeys,
     monthGroups,
@@ -592,13 +839,29 @@ function groupExportRecordsByMonth(records, from, to) {
       boxes: completeTotalBoxes,
       cuts: completeTotalCuts,
       beedis: completeTotalBeedis,
-      rate: completeTotalRate
+      rate: completeTotalRate,
+      profitWithoutCommission: completeProfitWithoutCommission,
+      commission: completeCommission,
+      totalProfit: completeTotalProfit
     }
   };
 }
 
 function generateExportPDFHTML(data) {
   if (!data) return '';
+
+  const profitHeaders = data.includeCommission
+    ? '<th class="col-profit-base">Net Profit (No Commission) (₹)</th><th class="col-commission">Commission (₹)</th>'
+    : '';
+  const profitCells = record => data.includeCommission
+    ? `<td class="col-profit-base">${formatNumber(record.profitWithoutCommission)}</td><td class="col-commission">${formatNumber(record.commission)}</td>`
+    : '';
+  const profitTotalHeaders = data.includeCommission
+    ? '<th style="text-align: right; width: 33.33%;">Net Profit (No Commission) (கமிஷன் இல்லை) (₹)</th><th style="text-align: right; width: 33.33%;">Commission (கமிஷன்) (₹)</th>'
+    : '';
+  const profitTotalCells = total => data.includeCommission
+    ? `<td class="col-profit-base" style="font-size: 16px; font-weight: 800; color: #0f172a; text-align: right;">${formatNumber(total.profitWithoutCommission)}</td><td class="col-commission" style="font-size: 16px; font-weight: 800; color: #0f172a; text-align: right;">${formatNumber(total.commission)}</td>`
+    : '';
 
   const fromDisp = data.from ? formatDisplayDate(data.from) : (data.records[0] ? formatDisplayDate(data.records[0].dateStr) : '-');
   const toDisp = data.to ? formatDisplayDate(data.to) : (data.records[data.records.length - 1] ? formatDisplayDate(data.records[data.records.length - 1].dateStr) : '-');
@@ -630,8 +893,16 @@ function generateExportPDFHTML(data) {
         <td class="col-cuts">${formatNumber(p.cuts)}</td>
         <td class="col-beedis">${formatNumber(p.beedis)}</td>
         <td class="col-rate">${formatNumber(p.rate)}</td>
+        ${profitCells(p)}
+        <td class="col-total-profit">${formatNumber(p.totalProfit)}</td>
       </tr>
     `).join('');
+    const monthlyProfitHeaders = data.includeCommission
+      ? '<th class="col-profit-base">Net Profit (No Commission)<br>(கமிஷன் இல்லை) (₹)</th><th class="col-commission">Commission<br>(கமிஷன்) (₹)</th>'
+      : '';
+    const monthlyProfitCells = data.includeCommission
+      ? `<td class="col-profit-base">${formatNumber(group.profitWithoutCommission)}</td><td class="col-commission">${formatNumber(group.commission)}</td>`
+      : '';
 
     return `
       <div class="tvs-month-block">
@@ -644,6 +915,8 @@ function generateExportPDFHTML(data) {
               <th class="col-cuts">Cuts (கட்டுகள்)</th>
               <th class="col-beedis">Beedies (பீடிகள்)</th>
               <th class="col-rate">Rate(மதிப்பு) (₹)</th>
+              ${profitHeaders}
+              <th class="col-total-profit">Total Profit (மொத்த லாபம்) (₹)</th>
             </tr>
           </thead>
           <tbody>
@@ -651,7 +924,29 @@ function generateExportPDFHTML(data) {
           </tbody>
         </table>
         <div class="tvs-month-total-line">
-          ${monthNameEn} Total (${monthNameTa} மாத மொத்தம்) = ${formatNumber(group.totalBoxes)} Boxes | ${formatNumber(group.totalCuts)} Cuts | ${formatNumber(group.totalBeedis)} Beedies | ${formatNumber(group.totalRate)} Rate (₹)
+          <strong>${monthNameEn} Total (${monthNameTa} மாத மொத்தம்)</strong>
+          <table class="tvs-table monthly-total-table">
+            <thead>
+              <tr>
+                <th class="col-boxes">Total Boxes<br>(மொத்த கட்டை)</th>
+                <th class="col-cuts">Total Cuts<br>(மொத்த கட்டுகள்)</th>
+                <th class="col-beedis">Total Beedies<br>(மொத்த பீடிகள்)</th>
+                <th class="col-rate">Total Rate<br>(மொத்த Rate மதிப்பு) (₹)</th>
+                ${monthlyProfitHeaders}
+                <th class="col-total-profit">Total Profit<br>(மொத்த லாபம்) (₹)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="col-boxes">${formatNumber(group.totalBoxes)}</td>
+                <td class="col-cuts">${formatNumber(group.totalCuts)}</td>
+                <td class="col-beedis">${formatNumber(group.totalBeedis)}</td>
+                <td class="col-rate">${formatNumber(group.totalRate)}</td>
+                ${monthlyProfitCells}
+                <td class="col-total-profit">${formatNumber(group.totalProfit)}</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
     `;
@@ -666,6 +961,7 @@ function generateExportPDFHTML(data) {
         <div class="tvs-pdf-subtitle">EXPORT REPORT (ஏற்றுமதி அறிக்கை)</div>
         <div class="tvs-pdf-daterange">
           Date Range: <strong>${fromDisp} to ${toDisp}</strong>
+          <br><strong>Commission: ${data.includeCommission ? 'Included' : 'Excluded'}</strong>
         </div>
       </div>
 
@@ -681,7 +977,9 @@ function generateExportPDFHTML(data) {
               <th style="text-align: right; width: 33.33%;">Total Boxes (மொத்த கட்டை)</th>
               <th style="text-align: right; width: 33.33%;">Total Cuts (மொத்த கட்டுகள்)</th>
               <th style="text-align: right; width: 33.33%;">Total Beedies (மொத்த பீடிகள்)</th>
-              <th style="text-align: right; width: 33.33%;">Total Rate(மொத்த மதிப்பு) (₹)</th>
+              <th style="text-align: right; width: 33.33%;">Total Rate (மொத்த Rate மதிப்பு) (₹)</th>
+              ${profitTotalHeaders}
+              <th style="text-align: right; width: 33.33%;">Total Profit (மொத்த லாபம்) (₹)</th>
             </tr>
           </thead>
           <tbody>
@@ -690,6 +988,8 @@ function generateExportPDFHTML(data) {
               <td class="col-cuts" style="font-size: 16px; font-weight: 800; color: #0f172a; text-align: right;">${formatNumber(ct.cuts)}</td>
               <td class="col-beedis" style="font-size: 16px; font-weight: 800; color: #0f172a; text-align: right;">${formatNumber(ct.beedis)}</td>
               <td class="col-rate" style="font-size: 16px; font-weight: 800; color: #0f172a; text-align: right;">${formatNumber(ct.rate)}</td>
+              ${profitTotalCells(ct)}
+              <td class="col-total-profit" style="font-size: 16px; font-weight: 800; color: #0f172a; text-align: right;">${formatNumber(ct.totalProfit)}</td>
             </tr>
           </tbody>
         </table>
@@ -764,7 +1064,7 @@ async function downloadExportPDF() {
 
     const effectiveFrom = from || getExportRecordISODate(filtered[0].date);
     const effectiveTo = to || getExportRecordISODate(filtered[filtered.length - 1].date);
-    const groupedData = groupExportRecordsByMonth(filtered, effectiveFrom, effectiveTo);
+    const groupedData = groupExportRecordsByMonth(filtered, effectiveFrom, effectiveTo, includeExportCommission);
 
     // Create temporary offscreen container
     const tempWrap = document.createElement('div');
@@ -1044,6 +1344,7 @@ function renderExportBarChart(granularity = currentExportChartGranularity) {
 
 window.addEventListener('languageChanged', () => {
   if (cachedExports) renderExportUI(cachedExports);
+  updateSummarySelectionControls();
   const boxesInput = document.getElementById('expBoxes');
   if (boxesInput && boxesInput.value) {
     handleExportBoxesInput(boxesInput.value);
@@ -1052,6 +1353,7 @@ window.addEventListener('languageChanged', () => {
 });
 
 document.addEventListener('DOMContentLoaded', () => {
+  updateSummarySelectionControls();
   loadExportData();
 });
 

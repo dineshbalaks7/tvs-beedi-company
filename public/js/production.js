@@ -21,7 +21,9 @@ function handleBoxesInput(val) {
   const powderGrams = (beedis / 1000) * powderPer1000;
   const salary = (beedis / 1000) * salaryPer1000;
   const rate = (beedis / 1000) * ratePer1000;
-  const profit = rate - salary;
+  const profitWithoutCommission = rate - salary;
+  const commission = (beedis * (window.appSettings?.commissionPercent ?? 0.10) / 1000) * ratePer1000;
+  const totalProfit = profitWithoutCommission + commission;
 
   const prevBoxesEl = document.getElementById('prevBoxes');
   if (prevBoxesEl) prevBoxesEl.textContent = formatNumber(boxes);
@@ -47,7 +49,13 @@ function handleBoxesInput(val) {
   const prevRateEl = document.getElementById('prevRate');
   if (prevRateEl) prevRateEl.textContent = formatINR(rate);
   const prevProfitEl = document.getElementById('prevProfit');
-  if (prevProfitEl) prevProfitEl.textContent = formatINR(profit);
+  if (prevProfitEl) prevProfitEl.textContent = formatINR(totalProfit);
+  const prevProfitWithoutCommissionEl = document.getElementById('prevProfitWithoutCommission');
+  if (prevProfitWithoutCommissionEl) prevProfitWithoutCommissionEl.textContent = formatINR(profitWithoutCommission);
+  const prevCommissionEl = document.getElementById('prevCommission');
+  if (prevCommissionEl) prevCommissionEl.textContent = formatINR(commission);
+  const prevTotalProfitEl = document.getElementById('prevTotalProfit');
+  if (prevTotalProfitEl) prevTotalProfitEl.textContent = formatINR(totalProfit);
 }
 
 function handleCutsInput(val) {
@@ -269,13 +277,15 @@ function renderProductionUI(records) {
   const isEn = (typeof currentLanguage !== 'undefined' && currentLanguage === 'en');
 
   if (!records || records.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="10" style="text-align:center; color: var(--text-dim);">${isEn ? 'No production records found' : 'உற்பத்தி பதிவுகள் எதுவும் இல்லை'}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="12" style="text-align:center; color: var(--text-dim);">${isEn ? 'No production records found' : 'உற்பத்தி பதிவுகள் எதுவும் இல்லை'}</td></tr>`;
     return;
   }
 
   tbody.innerHTML = records.map(p => {
     const boxes = p.boxes !== undefined ? p.boxes : Number(((p.cuts || 0) / 300).toFixed(1));
-    const profit = (p.rate || 0) - (p.salary || 0);
+    const profitWithoutCommission = (p.rate || 0) - (p.salary || 0);
+    const commission = ((p.beedis || 0) * (window.appSettings?.commissionPercent ?? 0.10) / 1000) * (window.appSettings?.ratePer1000 || 340);
+    const totalProfit = profitWithoutCommission + commission;
     return `
     <tr>
       <td><strong>${formatDate(p.date)}</strong></td>
@@ -286,7 +296,9 @@ function renderProductionUI(records) {
       <td>${(p.powderUsedGrams / 1000).toFixed(2)} kg</td>
       <td>${formatINR(p.salary)}</td>
       <td style="color: var(--accent-gold); font-weight: 700;">${formatINR(p.rate)}</td>
-      <td style="color: var(--accent-green, #059669); font-weight: 700;">${formatINR(profit)}</td>
+      <td>${formatINR(profitWithoutCommission)}</td>
+      <td>${formatINR(commission)}</td>
+      <td class="total-profit-cell" style="color: var(--accent-green, #059669); font-weight: 800;">${formatINR(totalProfit)}</td>
       <td>
         <div class="table-actions-cell">
           <button class="btn-secondary btn-table-action" onclick="startEditProduction('${p._id}')" title="Edit">✏️</button>
@@ -1027,7 +1039,7 @@ async function loadProductionData() {
 
 async function deleteProduction(id) {
   const isEn = (typeof currentLanguage !== 'undefined' && currentLanguage === 'en');
-  if (!confirm(isEn ? 'Are you sure you want to delete this record?' : 'இந்த பதிவை நீக்க விரும்புகிறீர்களா?')) return;
+  if (!await showConfirmDialog(isEn ? 'Are you sure you want to delete this record?' : 'இந்த பதிவை நீக்க விரும்புகிறீர்களா?')) return;
 
   try {
     const res = await fetch(`/api/production/${id}`, { method: 'DELETE' });

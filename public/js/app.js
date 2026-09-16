@@ -284,6 +284,20 @@ function renderDashboardUI(data) {
   document.getElementById('dashTodayExpenses').textContent = formatINR(data.totals.expenses);
   document.getElementById('dashTodayExpCount').textContent = `${data.totals.expenseCount} ${getTranslation('expensesCount')}`;
 
+  const commissionAmount = Number(data.totals.commissionAmount || 0);
+  const commissionEl = document.getElementById('dashTodayCommission');
+  if (commissionEl) {
+    commissionEl.textContent = formatINR(commissionAmount);
+    commissionEl.style.color = commissionAmount >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
+  }
+
+  const baseNetProfit = Number(data.totals.profitWithoutCommission || data.totals.baseNetProfit || 0);
+  const baseProfitEl = document.getElementById('dashTodayBaseProfit');
+  if (baseProfitEl) {
+    baseProfitEl.textContent = formatINR(baseNetProfit);
+    baseProfitEl.style.color = baseNetProfit >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
+  }
+
   const profitEl = document.getElementById('dashTodayProfit');
   profitEl.textContent = formatINR(data.totals.profit);
   profitEl.style.color = data.totals.profit >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
@@ -293,6 +307,10 @@ function renderDashboardUI(data) {
   document.getElementById('dashCalcRate').textContent = formatINR(data.totals.rate);
   document.getElementById('dashCalcSalary').textContent = formatINR(data.totals.salary);
   document.getElementById('dashCalcExpenses').textContent = formatINR(data.totals.expenses);
+  const dashCalcBaseProfitEl = document.getElementById('dashCalcBaseProfit');
+  if (dashCalcBaseProfitEl) dashCalcBaseProfitEl.textContent = formatINR(baseNetProfit);
+  const dashCalcCommissionEl = document.getElementById('dashCalcCommission');
+  if (dashCalcCommissionEl) dashCalcCommissionEl.textContent = formatINR(commissionAmount);
   const dashCalcProfitEl = document.getElementById('dashCalcProfit');
   dashCalcProfitEl.textContent = formatINR(data.totals.profit);
   dashCalcProfitEl.style.color = data.totals.profit >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
@@ -1377,7 +1395,7 @@ async function loadProductionData() {
 }
 
 async function deleteProduction(id) {
-  if (!confirm(getTranslation('deleteConfirm'))) return;
+  if (!await showConfirmDialog(getTranslation('deleteConfirm'))) return;
 
   try {
     const res = await fetch(`/api/production/${id}`, { method: 'DELETE' });
@@ -1689,7 +1707,7 @@ async function handleEditStockMovementSubmit(event) {
 }
 
 async function deleteStockMovementAction(movementId) {
-  if (!confirm(getTranslation('deleteMovementConfirm'))) return;
+  if (!await showConfirmDialog(getTranslation('deleteMovementConfirm'))) return;
 
   try {
     const res = await fetch(`/api/stock/movement/${movementId}`, {
@@ -1782,7 +1800,7 @@ async function loadExpensesData() {
 }
 
 async function deleteExpense(id) {
-  if (!confirm(getTranslation('deleteConfirm'))) return;
+  if (!await showConfirmDialog(getTranslation('deleteConfirm'))) return;
 
   try {
     const res = await fetch(`/api/expenses/${id}`, { method: 'DELETE' });
@@ -2240,7 +2258,7 @@ async function loadExportData(from = '', to = '') {
 }
 
 async function deleteExport(id) {
-  if (!confirm(getTranslation('deleteConfirm'))) return;
+  if (!await showConfirmDialog(getTranslation('deleteConfirm'))) return;
 
   try {
     const res = await fetch(`/api/export/${id}`, { method: 'DELETE' });

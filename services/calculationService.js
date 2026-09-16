@@ -11,6 +11,7 @@ function calculateProductionMetrics(input, settings = {}) {
   const powderPer1000 = settings.powderPer1000Grams || 200;
   const salaryPer1000 = settings.salaryPer1000 || 320;
   const ratePer1000 = settings.ratePer1000 || 340;
+  const commissionPercent = settings.commissionPercent ?? 0.10;
 
   let boxes = 0;
   let cuts = 0;
@@ -49,6 +50,10 @@ function calculateProductionMetrics(input, settings = {}) {
   const powderUsedGrams = (beedis / 1000) * powderPer1000;
   const salary = (beedis / 1000) * salaryPer1000;
   const rate = (beedis / 1000) * ratePer1000;
+  const commissionBeedies = beedis * commissionPercent;
+  const commissionAmount = (commissionBeedies / 1000) * ratePer1000;
+  const baseProfit = rate - salary;
+  const profit = baseProfit + commissionAmount;
 
   return {
     boxes,
@@ -60,8 +65,12 @@ function calculateProductionMetrics(input, settings = {}) {
     powderUsedKg: Number((powderUsedGrams / 1000).toFixed(2)),
     salary: Math.round(salary * 100) / 100,
     rate: Math.round(rate * 100) / 100,
-    grossMargin: Math.round((rate - salary) * 100) / 100,
-    profit: Math.round((rate - salary) * 100) / 100
+    commissionBeedies: Number(commissionBeedies.toFixed(2)),
+    commissionAmount: Math.round(commissionAmount * 100) / 100,
+    baseProfit: Math.round(baseProfit * 100) / 100,
+    grossMargin: Math.round(baseProfit * 100) / 100,
+    profit: Math.round(profit * 100) / 100,
+    netProfit: Math.round(profit * 100) / 100
   };
 }
 
@@ -88,22 +97,36 @@ function calculateBags(tobaccoKg, wastageKg = null, bagSizeGrams = null, setting
   };
 }
 
-function calculateProfit(totalRate, totalSalary, totalExpenses) {
+function calculateProfit(totalRate, totalSalary, totalExpenses, totalBeedis = 0, settings = {}) {
   const rateAmount = Number(totalRate) || 0;
   const salaryAmount = Number(totalSalary) || 0;
   const expenseAmount = Number(totalExpenses) || 0;
-  const rateSalaryDiff = Math.round((rateAmount - salaryAmount) * 100) / 100;
-  const profit = rateAmount - salaryAmount - expenseAmount;
+  const beedisAmount = Number(totalBeedis) || 0;
+  const commissionPercent = settings.commissionPercent ?? 0.10;
+  const ratePer1000 = Number(settings.ratePer1000 ?? 340);
+
+  const baseProfit = rateAmount - salaryAmount;
+  const commissionBeedies = beedisAmount * commissionPercent;
+  const commissionAmount = (commissionBeedies / 1000) * ratePer1000;
+  const profitWithoutCommission = baseProfit - expenseAmount;
+  const profit = profitWithoutCommission + commissionAmount;
   const profitMarginPercent = rateAmount > 0 ? Number(((profit / rateAmount) * 100).toFixed(2)) : 0;
 
   return {
     totalRate: rateAmount,
     totalSalary: salaryAmount,
     totalExpenses: expenseAmount,
-    rateSalaryDiff,
-    grossProfit: rateSalaryDiff,
+    totalBeedis: beedisAmount,
+    commissionBeedies: Number(commissionBeedies.toFixed(2)),
+    commissionAmount: Math.round(commissionAmount * 100) / 100,
+    baseProfit: Math.round(baseProfit * 100) / 100,
+    profitWithoutCommission: Math.round(profitWithoutCommission * 100) / 100,
+    baseNetProfit: Math.round(profitWithoutCommission * 100) / 100,
+    rateSalaryDiff: Math.round(baseProfit * 100) / 100,
+    grossProfit: Math.round(baseProfit * 100) / 100,
     netProfit: Math.round(profit * 100) / 100,
     profit: Math.round(profit * 100) / 100,
+    totalProfit: Math.round(profit * 100) / 100,
     profitMarginPercent,
     isProfitable: profit >= 0
   };

@@ -15,6 +15,35 @@ window.appSettings = {
   profitPerBox: 120
 };
 
+function showConfirmDialog(message, title, confirmLabel, confirmClass = 'btn-danger') {
+  return new Promise(resolve => {
+    const existing = document.getElementById('appConfirmModal');
+    if (existing) existing.remove();
+    const isEn = typeof currentLanguage !== 'undefined' && currentLanguage === 'en';
+    const modal = document.createElement('div');
+    modal.id = 'appConfirmModal';
+    modal.className = 'modal-overlay active';
+    modal.innerHTML = `
+      <div class="modal-dialog confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="appConfirmTitle">
+        <div class="modal-header">
+          <h3 id="appConfirmTitle">${title || (isEn ? 'Confirm Action' : 'செயலை உறுதிப்படுத்தவும்')}</h3>
+          <button type="button" class="modal-close-btn" aria-label="Close">&times;</button>
+        </div>
+        <div class="modal-body"><p>${message}</p></div>
+        <div class="modal-actions-row">
+          <button type="button" class="btn-secondary confirm-cancel">${isEn ? 'Cancel' : 'ரத்து'}</button>
+          <button type="button" class="${confirmClass} confirm-delete">${confirmLabel || (isEn ? 'Delete' : 'நீக்கு')}</button>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+    const close = result => { modal.remove(); resolve(result); };
+    modal.querySelector('.modal-close-btn').addEventListener('click', () => close(false));
+    modal.querySelector('.confirm-cancel').addEventListener('click', () => close(false));
+    modal.querySelector('.confirm-delete').addEventListener('click', () => close(true));
+    modal.addEventListener('click', event => { if (event.target === modal) close(false); });
+  });
+}
+
 function getLoadingScreen() {
   let screen = document.getElementById('appLoadingScreen');
   if (screen) return screen;
@@ -53,9 +82,14 @@ const nativeFetch = window.fetch.bind(window);
 let pendingRequests = 0;
 
 window.fetch = async function(...args) {
-  // Increment pending counter and show loading overlay
-  pendingRequests++;
-  setAppLoading(true, 'Loading...');
+  const requestUrl = typeof args[0] === 'string' ? args[0] : args[0]?.url || '';
+  const isChatRequest = requestUrl.includes('/api/chat');
+
+  // Chat has its own inline typing indicator instead of covering the conversation.
+  if (!isChatRequest) {
+    pendingRequests++;
+    setAppLoading(true, 'Loading...');
+  }
   try {
     const response = await nativeFetch(...args);
     // Handle session expiration
@@ -66,9 +100,11 @@ window.fetch = async function(...args) {
     return response;
   } finally {
     // Decrement counter and hide overlay only when all requests complete
-    pendingRequests--;
-    if (pendingRequests <= 0) {
-      setAppLoading(false);
+    if (!isChatRequest) {
+      pendingRequests--;
+      if (pendingRequests <= 0) {
+        setAppLoading(false);
+      }
     }
   }
 };

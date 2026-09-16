@@ -31,6 +31,8 @@ async function loadSettingsData() {
 
     const setRatePer1000El = document.getElementById('setRatePer1000');
     if (setRatePer1000El) setRatePer1000El.value = data.ratePer1000 || 340;
+    const setCommissionPercentEl = document.getElementById('setCommissionPercent');
+    if (setCommissionPercentEl) setCommissionPercentEl.value = Number(data.commissionPercent ?? 0.10) * 100;
 
     const setAvgWastageEl = document.getElementById('setAvgWastage');
     if (setAvgWastageEl) setAvgWastageEl.value = data.avgWastageKg ?? 2;
@@ -49,6 +51,17 @@ async function loadSettingsData() {
 async function handleSettingsSubmit(event) {
   event.preventDefault();
 
+  const isEn = typeof currentLanguage !== 'undefined' && currentLanguage === 'en';
+  const confirmed = await showConfirmDialog(
+    isEn
+      ? 'Warning: These settings will change future rate, salary, commission, and profit calculations. Do you want to save the changes?'
+      : 'எச்சரிக்கை: இந்த அமைப்புகள் இனி வரும் Rate, சம்பளம், கமிஷன் மற்றும் லாபக் கணக்கீடுகளை மாற்றும். மாற்றங்களைச் சேமிக்க விரும்புகிறீர்களா?',
+    isEn ? 'Confirm Settings Changes' : 'அமைப்பு மாற்றத்தை உறுதிப்படுத்தவும்',
+    isEn ? 'Save Changes' : 'மாற்றங்களைச் சேமிக்கவும்',
+    'btn-primary'
+  );
+  if (!confirmed) return;
+
   const payload = {
     beedisPerBox: Number(document.getElementById('setBeedisPerBox')?.value) || 6000,
     cutsPerBox: Number(document.getElementById('setCutsPerBox')?.value) || 300,
@@ -57,6 +70,7 @@ async function handleSettingsSubmit(event) {
     powderPer1000Grams: Number(document.getElementById('setPowderPer1000').value),
     salaryPer1000: Number(document.getElementById('setSalaryPer1000').value),
     ratePer1000: Number(document.getElementById('setRatePer1000').value),
+    commissionPercent: (Number(document.getElementById('setCommissionPercent').value) || 0) / 100,
     avgWastageKg: Number(document.getElementById('setAvgWastage').value),
     bagSizeGrams: Number(document.getElementById('setBagSize').value),
     lowStockThresholdKg: Number(document.getElementById('setLowStock').value)

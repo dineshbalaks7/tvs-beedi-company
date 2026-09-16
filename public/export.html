@@ -51,11 +51,25 @@
           <h2 class="section-title">🚚 <span data-i18n="exportMainTitle">கம்பெனி ஏற்றுமதி (Export & Dispatch)</span></h2>
           <p class="section-subtitle" data-i18n="exportSub">தயாரான கட்டைகள் கம்பெனிக்கு ஏற்றுமதி செய்யப்பட்ட விவரங்கள்</p>
         </div>
+        <div class="export-summary-filter-row">
+          <span class="overview-filter-label" data-i18n="exportSummaryPeriod">காலக்கட்டம்</span>
+          <div class="chart-filter-group" id="exportSummaryFilterGroup">
+            <button type="button" class="chart-filter-btn active" data-export-summary-period="day" onclick="setExportSummaryFilter('day', this)" data-i18n="exportFilterDay">நாள்</button>
+            <button type="button" class="chart-filter-btn" data-export-summary-period="week" onclick="setExportSummaryFilter('week', this)" data-i18n="exportFilterWeek">வாரம்</button>
+            <button type="button" class="chart-filter-btn" data-export-summary-period="month" onclick="setExportSummaryFilter('month', this)" data-i18n="exportFilterMonth">மாதம்</button>
+          </div>
+          <div id="exportSummarySelectionControls" class="export-summary-selection-controls">
+            <input type="date" id="exportSummaryDate" class="form-input" aria-label="Summary date" onchange="applyExportSummarySelection()">
+            <button type="button" id="exportSummaryYesterday" class="btn-secondary" onclick="selectExportSummaryDay(-1)" data-i18n="filterYesterday">நேற்று</button>
+            <select id="exportSummaryWeek" class="form-input" aria-label="Summary week" onchange="applyExportSummarySelection()"></select>
+            <select id="exportSummaryMonth" class="form-input" aria-label="Summary month" onchange="applyExportSummarySelection()"></select>
+          </div>
+        </div>
 
         <!-- Export Summary Metrics -->
         <div class="metrics-grid">
           <div class="metric-card">
-            <span class="metric-label" data-i18n="todayExport">இன்றைய ஏற்றுமதி</span>
+            <span class="metric-label" id="exportPeriodMetricLabel" data-i18n="todayExport">இன்றைய ஏற்றுமதி</span>
             <div class="metric-value" id="expTodayBoxes">0 <span class="metric-unit">Boxes</span></div>
             <div class="metric-sub" id="expTodayBeedis">0 பீடிகள்</div>
           </div>
@@ -67,9 +81,21 @@
           <div class="metric-card highlight-rate">
             <span class="metric-label" data-i18n="totalExportRate">மொத்த Rate மதிப்பு</span>
             <div class="metric-value" id="expTotalRate">₹0</div>
-            <div class="metric-sub" id="expTotalProfit">வித்தியாசம்: ₹0</div>
+            <div class="metric-sub" id="expTotalProfit">மொத்த லாபம்: ₹0</div>
           </div>
-          <div class="metric-card highlight-profit">
+          <div class="metric-card">
+            <span class="metric-label" data-i18n="netProfitNoCommission">நிகர லாபம் (கமிஷன் இல்லை)</span>
+            <div class="metric-value" id="expProfitWithoutCommission">₹0</div>
+          </div>
+          <div class="metric-card highlight-commission">
+            <span class="metric-label" data-i18n="commissionLabel">கமிஷன்</span>
+            <div class="metric-value" id="expCommission">₹0</div>
+          </div>
+          <div class="metric-card overall-profit">
+            <span class="metric-label" data-i18n="profitFormulaTotalProfit">மொத்த லாபம்</span>
+            <div class="metric-value" id="expTotalProfitValue">₹0</div>
+          </div>
+          <div class="metric-card">
             <span class="metric-label" data-i18n="packedStockInHand">கையிருப்பிலுள்ள கட்டைகள்</span>
             <div class="metric-value" id="expPackedStock">0 <span class="metric-unit">Boxes</span></div>
             <div class="metric-sub" id="expStockSub">உற்பத்தி − ஏற்றுமதி = மீதம்</div>
@@ -163,8 +189,16 @@
                   <span class="calc-chip-val" id="prevExpSalary">₹0</span>
                 </div>
                 <div class="calc-chip highlight">
-                  <span class="calc-chip-label" data-i18n="calcMargin">வித்தியாசம் (₹120/Bx)</span>
-                  <span class="calc-chip-val" id="prevExpMargin">₹0</span>
+                  <span class="calc-chip-label" data-i18n="netProfitNoCommission">நிகர லாபம் (கமிஷன் இல்லை)</span>
+                  <span class="calc-chip-val" id="prevExpProfitWithoutCommission">₹0</span>
+                </div>
+                <div class="calc-chip highlight-commission">
+                  <span class="calc-chip-label" data-i18n="commissionLabel">கமிஷன்</span>
+                  <span class="calc-chip-val" id="prevExpCommission">₹0</span>
+                </div>
+                <div class="calc-chip overall-profit">
+                  <span class="calc-chip-label" data-i18n="profitFormulaTotalProfit">மொத்த லாபம்</span>
+                  <span class="calc-chip-val" id="prevExpTotalProfit">₹0</span>
                 </div>
               </div>
             </div>
@@ -245,11 +279,16 @@
               <button type="button" class="btn-pdf-download" id="btnDownloadExportPDF" style="min-height: 38px; padding: 6px 14px;" onclick="downloadExportPDF()">
                 <span>📄</span> <span data-i18n="downloadPDFBtn">PDF பதிவிறக்கு</span>
               </button>
+              <label class="toggle-control" title="Include commission in report totals">
+                <input type="checkbox" id="includeCommissionToggle" checked onchange="toggleExportCommission(this.checked)">
+                <span class="toggle-slider"></span>
+                <span class="toggle-label" data-i18n="includeCommission">கமிஷனை சேர்க்கவும்</span>
+              </label>
             </div>
           </div>
 
           <div class="table-responsive">
-            <table class="data-table">
+            <table class="data-table" id="exportHistoryTable">
               <thead>
                 <tr>
                   <th data-i18n="colDate">தேதி</th>
@@ -257,12 +296,15 @@
                   <th data-i18n="colCuts">கட்டுகள்</th>
                   <th data-i18n="colBeedis">பீடிகள்</th>
                   <th data-i18n="colRate">Rate மதிப்பு</th>
+                  <th class="export-profit-base" data-i18n="netProfitNoCommission">Net Profit (No Commission)</th>
+                  <th class="export-commission" data-i18n="commissionLabel">Commission</th>
+                  <th class="export-total-profit" data-i18n="profitFormulaTotalProfit">Total Profit</th>
                   <th data-i18n="colCompany">கம்பெனி</th>
                   <th data-i18n="colActions">செயல்கள்</th>
                 </tr>
               </thead>
               <tbody id="exportTableBody">
-                <tr><td colspan="7" style="text-align:center;" data-i18n="loading">ஏற்றப்படுகிறது...</td></tr>
+                <tr><td colspan="10" style="text-align:center;" data-i18n="loading">ஏற்றப்படுகிறது...</td></tr>
               </tbody>
             </table>
           </div>

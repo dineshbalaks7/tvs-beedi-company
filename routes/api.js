@@ -152,8 +152,9 @@ router.get('/dashboard', async (req, res) => {
     const todayPowderGrams = todayProductions.reduce((sum, p) => sum + (p.powderUsedGrams || 0), 0);
     const todaySalary = todayProductions.reduce((sum, p) => sum + (p.salary || 0), 0);
     const todayRate = todayProductions.reduce((sum, p) => sum + (p.rate || 0), 0);
+    const todayBeedisValue = todayProductions.reduce((sum, p) => sum + (p.beedis || 0), 0);
     const todayExpenseTotal = todayExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
-    const todayProfit = calculateProfit(todayRate, todaySalary, todayExpenseTotal);
+    const todayProfit = calculateProfit(todayRate, todaySalary, todayExpenseTotal, todayBeedisValue, { ratePer1000: settings.ratePer1000 || 340 });
 
     // Month calculations
     const monthCuts = monthProductions.reduce((sum, p) => sum + (p.cuts || 0), 0);
@@ -162,8 +163,9 @@ router.get('/dashboard', async (req, res) => {
     const monthPowderGrams = monthProductions.reduce((sum, p) => sum + (p.powderUsedGrams || 0), 0);
     const monthSalary = monthProductions.reduce((sum, p) => sum + (p.salary || 0), 0);
     const monthRate = monthProductions.reduce((sum, p) => sum + (p.rate || 0), 0);
+    const monthBeedisValue = monthProductions.reduce((sum, p) => sum + (p.beedis || 0), 0);
     const monthExpenseTotal = monthExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
-    const monthProfit = calculateProfit(monthRate, monthSalary, monthExpenseTotal);
+    const monthProfit = calculateProfit(monthRate, monthSalary, monthExpenseTotal, monthBeedisValue, { ratePer1000: settings.ratePer1000 || 340 });
 
     res.json({
       today: {
@@ -176,6 +178,10 @@ router.get('/dashboard', async (req, res) => {
         salary: todaySalary,
         rate: todayRate,
         expenses: todayExpenseTotal,
+        commissionAmount: todayProfit.commissionAmount,
+        baseProfit: todayProfit.baseProfit,
+        profitWithoutCommission: todayProfit.profitWithoutCommission,
+        totalProfit: todayProfit.totalProfit,
         profit: todayProfit.profit,
         profitMargin: todayProfit.profitMarginPercent,
         productionCount: todayProductions.length,
@@ -189,6 +195,10 @@ router.get('/dashboard', async (req, res) => {
         salary: monthSalary,
         rate: monthRate,
         expenses: monthExpenseTotal,
+        commissionAmount: monthProfit.commissionAmount,
+        baseProfit: monthProfit.baseProfit,
+        profitWithoutCommission: monthProfit.profitWithoutCommission,
+        totalProfit: monthProfit.totalProfit,
         profit: monthProfit.profit,
         profitMargin: monthProfit.profitMarginPercent
       },
@@ -262,7 +272,7 @@ router.get(['/dashboard/analytics', '/analytics/dashboard'], async (req, res) =>
       const salary = prods.reduce((s, p) => s + (p.salary || 0), 0);
       const rate = prods.reduce((s, p) => s + (p.rate || 0), 0);
       const expensesTotal = exps.reduce((s, e) => s + (e.amount || 0), 0);
-      const profitData = calculateProfit(rate, salary, expensesTotal);
+      const profitData = calculateProfit(rate, salary, expensesTotal, beedis, { ratePer1000: settings.ratePer1000 || 340 });
       return {
         boxes: Number(boxes.toFixed(1)),
         cuts,
@@ -272,6 +282,10 @@ router.get(['/dashboard/analytics', '/analytics/dashboard'], async (req, res) =>
         salary,
         rate,
         expenses: expensesTotal,
+        commissionAmount: profitData.commissionAmount,
+        baseProfit: profitData.baseProfit,
+        profitWithoutCommission: profitData.profitWithoutCommission,
+        totalProfit: profitData.totalProfit,
         profit: profitData.profit,
         profitMargin: profitData.profitMarginPercent,
         productionCount: prods.length,
@@ -371,6 +385,9 @@ router.get(['/dashboard/analytics', '/analytics/dashboard'], async (req, res) =>
         salary: 0,
         rate: 0,
         expenses: 0,
+        profitWithoutCommission: 0,
+        commissionAmount: 0,
+        totalProfit: 0,
         profit: 0
       };
       curr.setDate(curr.getDate() + 1);
@@ -397,12 +414,15 @@ router.get(['/dashboard/analytics', '/analytics/dashboard'], async (req, res) =>
     });
 
     const timeSeries = Object.values(dayMap).map(d => {
-      const profitCalc = calculateProfit(d.rate, d.salary, d.expenses);
+      const profitCalc = calculateProfit(d.rate, d.salary, d.expenses, d.beedis || 0, { ratePer1000: settings.ratePer1000 || 340 });
       return {
         ...d,
         boxes: Number((d.boxes || 0).toFixed(1)),
         tobaccoKg: Number((d.tobaccoGrams / 1000).toFixed(2)),
         powderKg: Number((d.powderGrams / 1000).toFixed(2)),
+        profitWithoutCommission: profitCalc.profitWithoutCommission,
+        commissionAmount: profitCalc.commissionAmount,
+        totalProfit: profitCalc.totalProfit,
         profit: profitCalc.profit,
         profitMargin: profitCalc.profitMarginPercent
       };
@@ -451,7 +471,7 @@ router.get(['/dashboard/analytics', '/analytics/dashboard'], async (req, res) =>
       const mDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const mKey = `${mDate.getFullYear()}-${String(mDate.getMonth() + 1).padStart(2, '0')}`;
       const mLabel = mDate.toLocaleDateString('en-GB', { month: 'short', year: '2-digit' });
-      monthBuckets[mKey] = { key: mKey, label: mLabel, boxes: 0, beedis: 0, cuts: 0, rate: 0, salary: 0, expenses: 0, profit: 0 };
+      monthBuckets[mKey] = { key: mKey, label: mLabel, boxes: 0, beedis: 0, cuts: 0, rate: 0, salary: 0, expenses: 0, profitWithoutCommission: 0, commissionAmount: 0, totalProfit: 0, profit: 0 };
     }
 
     histProductions.forEach(p => {
@@ -475,8 +495,8 @@ router.get(['/dashboard/analytics', '/analytics/dashboard'], async (req, res) =>
     });
 
     const monthlyHistory = Object.values(monthBuckets).map(m => {
-      const pCalc = calculateProfit(m.rate, m.salary, m.expenses);
-      return { ...m, profit: pCalc.profit, profitMargin: pCalc.profitMarginPercent };
+      const pCalc = calculateProfit(m.rate, m.salary, m.expenses, m.beedis || 0, { ratePer1000: settings.ratePer1000 || 340 });
+      return { ...m, profitWithoutCommission: pCalc.profitWithoutCommission, commissionAmount: pCalc.commissionAmount, totalProfit: pCalc.totalProfit, profit: pCalc.profit, profitMargin: pCalc.profitMarginPercent };
     });
 
     res.json({
@@ -525,10 +545,11 @@ router.get('/analytics/history', async (req, res) => {
       startDate.setHours(0, 0, 0, 0);
     }
 
-    const [productions, exportsList, expenses] = await Promise.all([
+    const [productions, exportsList, expenses, settings] = await Promise.all([
       Production.find({ date: { $gte: startDate, $lte: endDate } }).sort({ date: 1 }),
       Export.find({ date: { $gte: startDate, $lte: endDate } }).sort({ date: 1 }),
-      Expense.find({ date: { $gte: startDate, $lte: endDate } }).sort({ date: 1 })
+      Expense.find({ date: { $gte: startDate, $lte: endDate } }).sort({ date: 1 }),
+      Settings.getSettings()
     ]);
 
     const buckets = {};
@@ -546,6 +567,7 @@ router.get('/analytics/history', async (req, res) => {
           prodBeedis: 0,
           prodRate: 0,
           prodSalary: 0,
+          prodBeedisValue: 0,
           prodProfit: 0,
           exportBoxes: 0,
           exportCuts: 0,
@@ -583,6 +605,7 @@ router.get('/analytics/history', async (req, res) => {
           prodBeedis: 0,
           prodRate: 0,
           prodSalary: 0,
+          prodBeedisValue: 0,
           prodProfit: 0,
           exportBoxes: 0,
           exportCuts: 0,
@@ -609,6 +632,7 @@ router.get('/analytics/history', async (req, res) => {
           prodBeedis: 0,
           prodRate: 0,
           prodSalary: 0,
+          prodBeedisValue: 0,
           prodProfit: 0,
           exportBoxes: 0,
           exportCuts: 0,
@@ -648,6 +672,7 @@ router.get('/analytics/history', async (req, res) => {
         buckets[k].prodBeedis += (p.beedis || 0);
         buckets[k].prodRate += (p.rate || 0);
         buckets[k].prodSalary += (p.salary || 0);
+        buckets[k].prodBeedisValue += (p.beedis || 0);
       }
     });
 
@@ -672,8 +697,7 @@ router.get('/analytics/history', async (req, res) => {
     });
 
     const series = Object.values(buckets).map(b => {
-      const prodProfit = b.prodRate - b.prodSalary;
-      const netProfit = prodProfit - b.expenses;
+      const profitCalc = calculateProfit(b.prodRate, b.prodSalary, b.expenses, b.prodBeedisValue, { ratePer1000: settings.ratePer1000 || 340 });
       return {
         key: b.key,
         label: b.label,
@@ -682,7 +706,7 @@ router.get('/analytics/history', async (req, res) => {
         prodBeedis: b.prodBeedis,
         prodRate: b.prodRate,
         prodSalary: b.prodSalary,
-        prodProfit,
+        prodProfit: profitCalc.profitWithoutCommission,
         exportBoxes: Number(b.exportBoxes.toFixed(1)),
         exportCuts: b.exportCuts,
         exportBeedis: b.exportBeedis,
@@ -690,7 +714,10 @@ router.get('/analytics/history', async (req, res) => {
         exportSalary: b.exportSalary,
         exportMargin: b.exportMargin,
         expenses: b.expenses,
-        netProfit
+        profitWithoutCommission: profitCalc.profitWithoutCommission,
+        commissionAmount: profitCalc.commissionAmount,
+        totalProfit: profitCalc.totalProfit,
+        netProfit: profitCalc.profit
       };
     });
 
@@ -1104,6 +1131,7 @@ async function getPackedStockInHand(excludeExportId = null) {
 // ==========================================
 router.get('/export', async (req, res) => {
   try {
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
     const filter = getDateFilter(req.query);
     const [exports, stockData, settings] = await Promise.all([
       Export.find(filter).sort({ date: -1, createdAt: -1 }),
@@ -1116,12 +1144,13 @@ router.get('/export', async (req, res) => {
     const totalBeedis = exports.reduce((sum, p) => sum + (p.beedis || 0), 0);
     const totalSalary = exports.reduce((sum, p) => sum + (p.salary || 0), 0);
     const totalRate = exports.reduce((sum, p) => sum + (p.rate || 0), 0);
-    const totalProfit = totalRate - totalSalary;
+    const exportProfitSummary = calculateProfit(totalRate, totalSalary, 0, totalBeedis, { ratePer1000: settings.ratePer1000 || 340 });
+    const totalProfit = exportProfitSummary.profit;
 
     // Today's exported boxes
     const todayBounds = getDayBounds(new Date());
     const todayExports = exports.filter(p => {
-      const dStr = new Date(p.date).toISOString().split('T')[0];
+      const dStr = getCalendarDateKey(p.date);
       return dStr === todayBounds.dateStr;
     });
     const todayBoxes = todayExports.reduce((sum, p) => sum + (p.boxes || (p.cuts / 300)), 0);
@@ -1136,6 +1165,10 @@ router.get('/export', async (req, res) => {
         beedis: totalBeedis,
         salary: totalSalary,
         rate: totalRate,
+        commissionAmount: exportProfitSummary.commissionAmount,
+        baseProfit: exportProfitSummary.baseProfit,
+        profitWithoutCommission: exportProfitSummary.profitWithoutCommission,
+        totalProfit: exportProfitSummary.totalProfit,
         profit: totalProfit,
         todayBoxes: Number(todayBoxes.toFixed(1)),
         totalProducedBoxes: Number(totalProducedBoxes.toFixed(1)),
@@ -1395,6 +1428,7 @@ router.put('/settings', async (req, res) => {
       'powderPer1000Grams',
       'salaryPer1000',
       'ratePer1000',
+      'commissionPercent',
       'avgWastageKg',
       'bagSizeGrams',
       'currency',

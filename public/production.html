@@ -168,9 +168,17 @@
                   <span class="calc-chip-label" data-i18n="calcRate">Rate மதிப்பு (₹2,040/Bx)</span>
                   <span class="calc-chip-val" id="prevRate">₹0</span>
                 </div>
-                <div class="calc-chip highlight-profit">
-                  <span class="calc-chip-label" data-i18n="calcProfit">லாபம் (Rate − கூலி) (₹120/Bx)</span>
-                  <span class="calc-chip-val" id="prevProfit">₹0</span>
+                <div class="calc-chip">
+                  <span class="calc-chip-label" data-i18n="netProfitNoCommission">நிகர லாபம் (கமிஷன் இல்லை)</span>
+                  <span class="calc-chip-val" id="prevProfitWithoutCommission">₹0</span>
+                </div>
+                <div class="calc-chip highlight-commission">
+                  <span class="calc-chip-label" data-i18n="todayCommission">கமிஷன்</span>
+                  <span class="calc-chip-val" id="prevCommission">₹0</span>
+                </div>
+                <div class="calc-chip overall-profit">
+                  <span class="calc-chip-label" data-i18n="profitFormulaTotalProfit">மொத்த லாபம்</span>
+                  <span class="calc-chip-val" id="prevTotalProfit">₹0</span>
                 </div>
               </div>
             </div>
@@ -296,12 +304,14 @@
                   <th data-i18n="colPowder">தூள்</th>
                   <th data-i18n="colSalary">சம்பளம்</th>
                   <th data-i18n="colRate">Rate</th>
-                  <th data-i18n="colProfit">லாபம்</th>
+                  <th data-i18n="netProfitNoCommission">Net Profit (No Commission)</th>
+                  <th data-i18n="commissionLabel">Commission</th>
+                  <th data-i18n="profitFormulaTotalProfit">Total Profit</th>
                   <th data-i18n="colActions">செயல்கள்</th>
                 </tr>
               </thead>
               <tbody id="productionTableBody">
-                <tr><td colspan="10" style="text-align:center;" data-i18n="loading">ஏற்றப்படுகிறது...</td></tr>
+                <tr><td colspan="12" style="text-align:center;" data-i18n="loading">ஏற்றப்படுகிறது...</td></tr>
               </tbody>
             </table>
           </div>
