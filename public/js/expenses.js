@@ -73,6 +73,7 @@ async function loadExpensesData() {
     renderExpensesUI(records);
   } catch (err) {
     console.error('Error loading expenses:', err);
+    showDataLoadError('expenseTableBody', 'Unable to load expense records');
   }
 }
 

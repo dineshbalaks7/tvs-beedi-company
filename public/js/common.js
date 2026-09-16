@@ -74,6 +74,16 @@ function setAppLoading(isLoading, message = 'Loading...') {
 
 window.setAppLoading = setAppLoading;
 
+function showDataLoadError(tableBodyId, message = 'Unable to load records') {
+  const tableBody = document.getElementById(tableBodyId);
+  const cell = tableBody?.querySelector('td');
+  if (!cell) return;
+  cell.textContent = message;
+  cell.style.color = 'var(--accent-red)';
+}
+
+window.showDataLoadError = showDataLoadError;
+
 let redirectingToLogin = false;
 const nativeFetch = window.fetch.bind(window);
 

@@ -674,6 +674,7 @@ async function loadExportData(from = '', to = '') {
     applyExportSummarySelection();
   } catch (err) {
     console.error('Error loading export data:', err);
+    showDataLoadError('exportTableBody', 'Unable to load export records');
   }
 }
 

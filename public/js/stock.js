@@ -14,6 +14,7 @@ async function loadStockData() {
     renderStockUI(data);
   } catch (err) {
     console.error('Error loading stock data:', err);
+    showDataLoadError('stockMovementsTableBody', 'Unable to load stock records');
     showToast('Failed to load stock data', 'error');
   }
 }

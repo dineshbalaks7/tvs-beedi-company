@@ -1034,6 +1034,7 @@ async function loadProductionData() {
     await applyProductionDateFilter();
   } catch (err) {
     console.error('Error loading production records:', err);
+    showDataLoadError('productionTableBody', 'Unable to load production records');
   }
 }
 
