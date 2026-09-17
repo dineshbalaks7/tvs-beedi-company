@@ -467,6 +467,11 @@
 }
 
 @media (max-width: 639px) {
+  #dashWeeklyOverviewCard .card-title-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
   .dash-period-pills {
     width: 100%;
     overflow-x: auto;
@@ -499,7 +504,12 @@
   }
 
   .overview-filter {
-    flex: 1 1 130px;
+    flex: 1 1 0;
+    min-width: 0;
+    height: 36px;
+    min-height: 36px;
+    padding: 6px 24px 6px 8px;
+    font-size: 11px;
   }
 
   .chart-card .chart-canvas-wrapper {

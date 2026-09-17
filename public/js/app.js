@@ -52,12 +52,7 @@ function formatDate(dateStr) {
   if (!dateStr) return '-';
   const d = new Date(dateStr);
   if (isNaN(d.getTime())) return '-';
-  const isEn = (typeof currentLanguage !== 'undefined' && currentLanguage === 'en');
-  return d.toLocaleDateString(isEn ? 'en-IN' : 'ta-IN', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric'
-  });
+  return `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()}`;
 }
 
 function getTodayISODate() {

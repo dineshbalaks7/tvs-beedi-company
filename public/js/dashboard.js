@@ -89,6 +89,21 @@ function updateDashboardPeriodPills() {
   const badgeText = document.getElementById('dashPeriodBadgeText');
   const mainTitle = document.getElementById('dashMainTitle');
   const mainSubtitle = document.getElementById('dashMainSubtitle');
+  const labels = {
+    boxes: document.getElementById('metricLabelBoxes'),
+    beedis: document.getElementById('metricLabelBeedis'),
+    tobacco: document.getElementById('metricLabelTobacco'),
+    powder: document.getElementById('metricLabelPowder'),
+    rate: document.getElementById('metricLabelRate'),
+    expenses: document.getElementById('metricLabelExpenses'),
+    baseProfit: document.getElementById('metricLabelBaseProfit'),
+    commission: document.getElementById('metricLabelCommission'),
+    profit: document.getElementById('metricLabelProfit'),
+    formula: document.getElementById('dashProfitFormulaTitle')
+  };
+  const setLabel = (name, text) => {
+    if (labels[name]) labels[name].textContent = text;
+  };
 
   [btnDay, btnWeek, btnMonth].forEach(b => b && b.classList.remove('active'));
 
@@ -97,16 +112,46 @@ function updateDashboardPeriodPills() {
     if (badgeText) badgeText.textContent = isEn ? 'Live: Day-wise' : 'நேரடி: இன்று';
     if (mainTitle) mainTitle.textContent = isEn ? "Today's Business Live" : 'இன்றைய நிலவரம்';
     if (mainSubtitle) mainSubtitle.textContent = isEn ? "Live production & financial breakdown for today" : 'இன்றைய நேரடி உற்பத்தி & நிதி விவரங்கள்';
+    setLabel('boxes', isEn ? 'Today Boxes' : 'இன்று கட்டை (Boxes)');
+    setLabel('beedis', isEn ? 'Today Beedis' : 'இன்று பீடிகள்');
+    setLabel('tobacco', isEn ? 'Tobacco Used Today' : 'இன்று Tobacco பயன்பாடு');
+    setLabel('powder', isEn ? 'Powder Used Today' : 'இன்று தூள் பயன்பாடு');
+    setLabel('rate', isEn ? "Today's Rate Value" : 'இன்றைய Rate மதிப்பு');
+    setLabel('expenses', isEn ? "Today's Expenses" : 'இன்றைய செலவுகள்');
+    setLabel('baseProfit', isEn ? 'Net Profit (No Commission)' : 'நிகர லாபம் (கமிஷன் இல்லை)');
+    setLabel('commission', isEn ? "Today's Commission" : 'இன்றைய கமிஷன்');
+    setLabel('profit', isEn ? "Today's Net Profit" : 'இன்றைய நிகர லாபம்');
+    setLabel('formula', isEn ? "Today's Net Profit (Profit)" : 'இன்றைய நிகர லாபம் (Profit)');
   } else if (currentDashboardPeriod === 'week') {
     if (btnWeek) btnWeek.classList.add('active');
     if (badgeText) badgeText.textContent = isEn ? 'Weekly: 7 Days' : 'வாராந்திர: 7 நாட்கள்';
     if (mainTitle) mainTitle.textContent = isEn ? "Weekly Performance (7 Days)" : 'இந்த வார நிலவரம் (7 நாட்கள்)';
     if (mainSubtitle) mainSubtitle.textContent = isEn ? "Summary across the current 7-day period" : 'இந்த வார உற்பத்தி, Rate, கூலி & லாப நிலவரம்';
+    setLabel('boxes', isEn ? 'This Week Boxes' : 'இந்த வார கட்டை (Boxes)');
+    setLabel('beedis', isEn ? 'Beedis Produced This Week' : 'இந்த வாரம் தயாரித்த பீடிகள்');
+    setLabel('tobacco', isEn ? 'Tobacco Used This Week' : 'இந்த வார Tobacco பயன்பாடு');
+    setLabel('powder', isEn ? 'Powder Used This Week' : 'இந்த வார தூள் பயன்பாடு');
+    setLabel('rate', isEn ? 'This Week Rate Value' : 'இந்த வார Rate மதிப்பு');
+    setLabel('expenses', isEn ? 'This Week Expenses' : 'இந்த வார செலவுகள்');
+    setLabel('baseProfit', isEn ? 'Weekly Net Profit (No Commission)' : 'வார நிகர லாபம் (கமிஷன் இல்லை)');
+    setLabel('commission', isEn ? 'This Week Commission' : 'இந்த வார கமிஷன்');
+    setLabel('profit', isEn ? 'This Week Net Profit' : 'இந்த வார நிகர லாபம்');
+    setLabel('formula', isEn ? 'Weekly Net Profit (Profit)' : 'இந்த வார நிகர லாபம் (Profit)');
   } else if (currentDashboardPeriod === 'month') {
     if (btnMonth) btnMonth.classList.add('active');
     if (badgeText) badgeText.textContent = isEn ? 'Monthly: Current Month' : 'மாதாந்திர: நடப்பு மாதம்';
     if (mainTitle) mainTitle.textContent = isEn ? "Monthly Performance Overview" : 'இந்த மாத நிலவரம்';
     if (mainSubtitle) mainSubtitle.textContent = isEn ? "Comprehensive overview for the entire current month" : 'இந்த மாத முழுமையான உற்பத்தி & நிதி நிலவரம்';
+    setLabel('boxes', isEn ? 'This Month Boxes' : 'இந்த மாத கட்டை (Boxes)');
+    setLabel('beedis', isEn ? 'Beedis Produced This Month' : 'இந்த மாதம் தயாரித்த பீடிகள்');
+    setLabel('tobacco', isEn ? 'Tobacco Used This Month' : 'இந்த மாத Tobacco பயன்பாடு');
+    setLabel('powder', isEn ? 'Powder Used This Month' : 'இந்த மாத தூள் பயன்பாடு');
+    setLabel('rate', isEn ? 'This Month Rate Value' : 'இந்த மாத Rate மதிப்பு');
+    setLabel('expenses', isEn ? 'This Month Expenses' : 'இந்த மாத செலவுகள்');
+    setLabel('baseProfit', isEn ? 'Monthly Net Profit (No Commission)' : 'மாத நிகர லாபம் (கமிஷன் இல்லை)');
+    setLabel('commission', isEn ? 'This Month Commission' : 'இந்த மாத கமிஷன்');
+    setLabel('profit', isEn ? 'This Month Net Profit' : 'இந்த மாத நிகர லாபம்');
+    setLabel('formula', isEn ? 'Monthly Net Profit (Profit)' : 'இந்த மாத நிகர லாபம் (Profit)');
   }
 }
 
@@ -593,7 +638,7 @@ function renderDashboardUI(data) {
         const rowProfitMetrics = getProfitMetrics(row);
         return `
         <tr>
-          <td><strong>${row.displayDate || formatDate(row.date)}</strong></td>
+          <td><strong>${formatDate(row.date || row.displayDate)}</strong></td>
           <td><span class="badge badge-accent">${row.boxes || 0} Boxes</span></td>
           <td>${formatNumber(row.cuts)}</td>
           <td>${formatNumber(row.beedis)}</td>
@@ -692,6 +737,12 @@ function renderPeriodComparisonCard(data, period = currentComparisonPeriod) {
 
   const compTag = document.getElementById('comparisonPeriodTag');
   const subTitle = document.getElementById('comparisonSubtitle');
+  const commissionLabel = document.getElementById('comparisonCommissionLabel');
+
+  let commissionPeriodText = isEn ? "Today's Commission" : 'இன்றைய கமிஷன்';
+  if (period === 'week') commissionPeriodText = isEn ? 'This Week Commission' : 'இந்த வார கமிஷன்';
+  if (period === 'month') commissionPeriodText = isEn ? 'This Month Commission' : 'இந்த மாத கமிஷன்';
+  if (commissionLabel) commissionLabel.textContent = commissionPeriodText;
 
   if (period === 'day') {
     if (compTag) compTag.textContent = isEn ? 'Today vs Yesterday' : 'இன்று vs நேற்று';

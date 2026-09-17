@@ -147,7 +147,7 @@
           </div>
           <div class="metric-card">
             <div class="metric-card-top">
-              <span class="metric-label" data-i18n="netProfitNoCommission">நிகர லாபம் (கமிஷன் இல்லை)</span>
+              <span class="metric-label" id="metricLabelBaseProfit" data-i18n="netProfitNoCommission">நிகர லாபம் (கமிஷன் இல்லை)</span>
               <div class="dash-metric-compare" id="compareBadgeBaseProfit"></div>
             </div>
             <div class="metric-value" id="dashTodayBaseProfit">₹0</div>
@@ -155,7 +155,7 @@
           </div>
           <div class="metric-card highlight-commission">
             <div class="metric-card-top">
-              <span class="metric-label" data-i18n="todayCommission">இன்றைய கமிஷன்</span>
+              <span class="metric-label" id="metricLabelCommission" data-i18n="todayCommission">இன்றைய கமிஷன்</span>
               <div class="dash-metric-compare" id="compareBadgeCommission"></div>
             </div>
             <div class="metric-value" id="dashTodayCommission">₹0</div>
@@ -353,7 +353,7 @@
               <div class="comp-delta-text" id="compDeltaBaseProfit">Δ ₹0</div>
             </div>
             <div class="comp-item highlight-commission">
-              <div class="comp-item-header"><span class="comp-metric-name" data-i18n="todayCommission">Commission</span><span class="comp-growth-pill" id="compGrowthCommission">+₹0</span></div>
+              <div class="comp-item-header"><span class="comp-metric-name" id="comparisonCommissionLabel" data-i18n="todayCommission">Commission</span><span class="comp-growth-pill" id="compGrowthCommission">+₹0</span></div>
               <div class="comp-values-row"><div class="comp-col"><span class="comp-col-label comp-label-current">Current</span><span class="comp-val current" id="compCurCommission">₹0</span></div><div class="comp-divider">vs</div><div class="comp-col"><span class="comp-col-label comp-label-previous">Previous</span><span class="comp-val prev" id="compPrevCommission">₹0</span></div></div>
               <div class="comp-delta-text" id="compDeltaCommission">Δ ₹0</div>
             </div>

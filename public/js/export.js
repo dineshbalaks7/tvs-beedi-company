@@ -63,7 +63,9 @@ function populateSummaryWeekOptions(monthValue) {
     const endDay = Math.min(startDay + 6, lastDay);
     const from = toISODate(new Date(year, month - 1, startDay));
     const to = toISODate(new Date(year, month - 1, endDay));
-    const label = isEn ? `Week ${week} (${from} to ${to})` : `வாரம் ${week} (${from} முதல் ${to} வரை)`;
+    const fromDisplay = formatDate(from);
+    const toDisplay = formatDate(to);
+    const label = isEn ? `Week ${week} (${fromDisplay} to ${toDisplay})` : `வாரம் ${week} (${fromDisplay} முதல் ${toDisplay} வரை)`;
     return `<option value="${from}|${to}">${label}</option>`;
   }).join('');
   if ([...weekSelect.options].some(option => option.value === previousValue)) {
