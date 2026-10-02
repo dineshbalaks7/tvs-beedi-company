@@ -5,11 +5,17 @@
  */
 
 // Application State
+let cachedLocalSettingsApp = null;
+try {
+  const stored = localStorage.getItem('tvs_app_settings');
+  if (stored) cachedLocalSettingsApp = JSON.parse(stored);
+} catch (e) {}
+
 let appSettings = {
   beedisPerBox: 6000,
   cutsPerBox: 300,
   beedisPerCut: 20,
-  tobaccoPer1000Grams: 600,
+  tobaccoPer1000Grams: 550,
   powderPer1000Grams: 200,
   salaryPer1000: 320,
   ratePer1000: 340,
@@ -17,7 +23,8 @@ let appSettings = {
   bagSizeGrams: 600,
   currency: '₹',
   language: 'ta',
-  lowStockThresholdKg: 5
+  lowStockThresholdKg: 5,
+  ...(cachedLocalSettingsApp || {})
 };
 
 let currentTab = 'dashboard';

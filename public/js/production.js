@@ -6,11 +6,43 @@
 let cachedProduction = [];
 let currentDuplicateRecord = null;
 
+function updateProductionPreviewLabels() {
+  const s = window.appSettings || {};
+  const tob = s.tobaccoPer1000Grams || 550;
+  const pow = s.powderPer1000Grams || 200;
+  const sal = s.salaryPer1000 || 320;
+  const rat = s.ratePer1000 || 340;
+  const beedisPerBox = s.beedisPerBox || 6000;
+  const salPerBox = Math.round((beedisPerBox / 1000) * sal);
+  const ratPerBox = Math.round((beedisPerBox / 1000) * rat);
+  const isEn = (typeof currentLanguage !== 'undefined' && currentLanguage === 'en');
+
+  const tobLabel = document.getElementById('calcTobaccoLabel');
+  if (tobLabel) tobLabel.textContent = isEn ? `Tobacco Required (${tob}g/1,000)` : `Tobacco பயன்பாடு (${tob}g/1,000)`;
+
+  const powLabel = document.getElementById('calcPowderLabel');
+  if (powLabel) powLabel.textContent = isEn ? `Powder Required (${pow}g/1,000)` : `தூள் பயன்பாடு (${pow}g/1,000)`;
+
+  const salLabel = document.getElementById('calcSalaryLabel');
+  if (salLabel) salLabel.textContent = isEn ? `Salary (₹${salPerBox.toLocaleString('en-IN')}/Bx)` : `கூலி மதிப்பு (₹${salPerBox.toLocaleString('en-IN')}/Bx)`;
+
+  const ratLabel = document.getElementById('calcRateLabel');
+  if (ratLabel) ratLabel.textContent = isEn ? `Rate (₹${ratPerBox.toLocaleString('en-IN')}/Bx)` : `Rate மதிப்பு (₹${ratPerBox.toLocaleString('en-IN')}/Bx)`;
+
+  const ratiosEl = document.getElementById('calcPreviewRatios');
+  if (ratiosEl) {
+    ratiosEl.textContent = isEn
+      ? `Active Settings: ${tob}g Tobacco • ${pow}g Powder • ₹${sal} Salary • ₹${rat} Rate per 1,000 Beedis`
+      : `தற்போதைய அமைப்புகள்: 1,000 பீடிக்கு ${tob}g Tobacco • ${pow}g தூள் • ₹${sal} கூலி • ₹${rat} Rate`;
+  }
+}
+window.updateProductionPreviewLabels = updateProductionPreviewLabels;
+
 function handleBoxesInput(val) {
   const boxes = Number(val) || 0;
   const beedisPerBox = window.appSettings?.beedisPerBox || 6000;
   const cutsPerBox = window.appSettings?.cutsPerBox || 300;
-  const tobaccoPer1000 = window.appSettings?.tobaccoPer1000Grams || 600;
+  const tobaccoPer1000 = window.appSettings?.tobaccoPer1000Grams || 550;
   const powderPer1000 = window.appSettings?.powderPer1000Grams || 200;
   const salaryPer1000 = window.appSettings?.salaryPer1000 || 320;
   const ratePer1000 = window.appSettings?.ratePer1000 || 340;
@@ -1335,6 +1367,7 @@ window.addEventListener('languageChanged', () => {
   if (cachedProduction.length > 0) renderProductionDashboardSummary(cachedProduction);
   if (currentFilteredData) renderFilteredProductionUI(currentFilteredData);
   const boxesInput = document.getElementById('prodBoxes');
+  updateProductionPreviewLabels();
   if (boxesInput && boxesInput.value) {
     handleBoxesInput(boxesInput.value);
   }
@@ -1342,7 +1375,23 @@ window.addEventListener('languageChanged', () => {
   renderProductionConsumptionChart(currentProdChartGranularity);
 });
 
+window.addEventListener('settingsLoaded', () => {
+  updateProductionPreviewLabels();
+  const boxesInput = document.getElementById('prodBoxes');
+  const cutsInput = document.getElementById('prodCuts');
+  if (boxesInput && boxesInput.value) {
+    handleBoxesInput(boxesInput.value);
+  } else if (cutsInput && cutsInput.value) {
+    handleCutsInput(cutsInput.value);
+  }
+  if (cachedProduction.length > 0) {
+    renderProductionUI(cachedProduction);
+    renderProductionDashboardSummary(cachedProduction);
+  }
+});
+
 document.addEventListener('DOMContentLoaded', () => {
+  updateProductionPreviewLabels();
   const tm = getThisMonthRange();
   const fromInput = document.getElementById('prodFilterFromDate');
   const toInput = document.getElementById('prodFilterToDate');

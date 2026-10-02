@@ -324,6 +324,13 @@ const translations = {
     // Stock Modal
     modalAddTitle: 'சரக்கு சேர்க்க (Add Stock)',
     modalAdjustTitle: 'இருப்பு திருத்தம் (Adjust Balance)',
+    modalWastageTitle: 'கழிவு கழித்தல் (- இருப்பு கழிவு)',
+    btnWastage: '- கழிவு',
+    modalKgLabelWastage: 'கழிக்க வேண்டிய கழிவு அளவு (கிலோ / kg)',
+    toggleIncludeUsage: 'உற்பத்தி பயன்பாட்டை சேர்க்க (Export Boxes)',
+    snapExportBoxesLabel: 'ஏற்றுமதி கட்டை (Export Boxes):',
+    snapUsageLabel: 'பயன்பாடு (Export Usage):',
+    snapNetBalanceLabel: 'நிகர இருப்பு (Net Balance):',
     editMovementTitle: 'சரக்கு பதிவு திருத்துதல்',
     quantityKgLabel: 'அளவு (கிலோ / kg)',
     modalItemLabel: 'பொருள் (Item)',
@@ -844,6 +851,13 @@ const translations = {
     // Stock Modal
     modalAddTitle: 'Add New Stock',
     modalAdjustTitle: 'Adjust Stock Balance',
+    modalWastageTitle: 'Deduct Wastage (- Stock)',
+    btnWastage: '- Wastage',
+    modalKgLabelWastage: 'Wastage Quantity to Deduct (kg)',
+    toggleIncludeUsage: 'Include Production Usage (Export Boxes)',
+    snapExportBoxesLabel: 'Export Boxes:',
+    snapUsageLabel: 'Export Usage:',
+    snapNetBalanceLabel: 'Net Balance:',
     editMovementTitle: 'Edit Stock Movement',
     quantityKgLabel: 'Quantity (kg)',
     modalItemLabel: 'Item',
@@ -1097,6 +1111,55 @@ function getTranslation(key) {
 }
 
 function applyTranslations() {
+  // Dynamically refresh settings-dependent translation strings
+  const s = window.appSettings || {};
+  const tobGrams = s.tobaccoPer1000Grams ?? 600;
+  const powGrams = s.powderPer1000Grams ?? 200;
+  const salPer1000 = s.salaryPer1000 ?? 320;
+  const ratPer1000 = s.ratePer1000 ?? 340;
+  const beedisPerBox = s.beedisPerBox ?? 6000;
+  const cutsPerBox = s.cutsPerBox ?? 300;
+  const beedisPerCut = s.beedisPerCut ?? (beedisPerBox / cutsPerBox);
+  const bagSize = s.bagSizeGrams ?? 600;
+  const wastage = s.avgWastageKg ?? 2;
+  const salPerBox = Math.round((beedisPerBox / 1000) * salPer1000);
+  const ratPerBox = Math.round((beedisPerBox / 1000) * ratPer1000);
+  const packableBags = bagSize > 0 ? Math.floor(Math.max(0, 35 - wastage) * 1000 / bagSize) : 55;
+
+  if (translations.ta) {
+    translations.ta.ratioTobacco = `${tobGrams}g / 1,000 பீடி`;
+    translations.ta.ratioPowder = `${powGrams}g / 1,000 பீடி`;
+    translations.ta.ratioRate = `₹${ratPer1000} / 1,000 பீடி`;
+    translations.ta.ratioSalary = `₹${salPer1000} / 1,000 பீடி`;
+    translations.ta.ratioBeedisPerCut = `1 கட்டு = ${beedisPerCut} பீடிகள்`;
+    translations.ta.stockWastageInfo = `கழிவு ${wastage}kg போக: ${packableBags} Bags (${bagSize}g)`;
+    translations.ta.autoPowderDeduct = `1,000 பீடிக்கு ${powGrams}g தானாகக் கழியும்`;
+    translations.ta.calcSalary = `கூலி மதிப்பு (₹${salPerBox.toLocaleString('en-IN')}/Bx)`;
+    translations.ta.calcRate = `Rate மதிப்பு (₹${ratPerBox.toLocaleString('en-IN')}/Bx)`;
+    translations.ta.colPackableBags = `${bagSize}g பைகள்`;
+    translations.ta.bagCalcDesc = `35 கிலோவில் ${wastage} கிலோ கழிவு போக ${bagSize}g கொண்ட ${packableBags} பைகள் கணக்கீடு`;
+    translations.ta.bagCalcSub = `மொத்த புகையிலையிலிருந்து ${wastage}kg கழிவு போக ஒரு பைக்கு ${bagSize}g வீதம் எத்தனை பைகள் பிரிக்கலாம் என்ற உடனடி கணக்கீடு`;
+  }
+  if (translations.en) {
+    translations.en.ratioTobacco = `${tobGrams}g / 1,000 Beedis`;
+    translations.en.ratioPowder = `${powGrams}g / 1,000 Beedis`;
+    translations.en.ratioRate = `₹${ratPer1000} / 1,000 Beedis`;
+    translations.en.ratioSalary = `₹${salPer1000} / 1,000 Beedis`;
+    translations.en.ratioBeedisPerCut = `1 Cut = ${beedisPerCut} Beedis`;
+    translations.en.stockWastageInfo = `After ${wastage}kg wastage: ${packableBags} Bags (${bagSize}g)`;
+    translations.en.autoPowderDeduct = `${powGrams}g per 1,000 beedis automatically deducted`;
+    translations.en.calcSalary = `Salary Value (₹${salPerBox.toLocaleString('en-IN')}/Bx)`;
+    translations.en.calcRate = `Rate Value (₹${ratPerBox.toLocaleString('en-IN')}/Bx)`;
+    translations.en.colPackableBags = `${bagSize}g Bags`;
+    translations.en.bagCalcDesc = `Calculate ${bagSize}g bags from raw tobacco after deducting wastage`;
+    translations.en.bagCalcSub = `Instant calculation of ${bagSize}g bags from raw tobacco after deducting ${wastage}kg average wastage`;
+  }
+
+  const badge = document.getElementById('bagCalcRatioBadge');
+  if (badge) {
+    badge.textContent = `${bagSize}g / ${currentLanguage === 'en' ? 'Bag' : 'பை'}`;
+  }
+
   const dict = translations[currentLanguage] || translations.ta;
 
   // 1. Text content elements with data-i18n attribute
@@ -1263,4 +1326,8 @@ window.addEventListener('DOMContentLoaded', () => {
   }
   applyTranslations();
   setupLanguageSwitcher();
+});
+
+window.addEventListener('settingsLoaded', () => {
+  applyTranslations();
 });

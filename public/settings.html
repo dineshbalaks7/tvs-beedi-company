@@ -61,19 +61,19 @@
             <div class="form-grid">
               <div class="form-group">
                 <label class="form-label" for="setBeedisPerBox" data-i18n="beedisPerBoxSetting">1 கட்டைக்கு பீடிகள் (Beedis per Box)</label>
-                <input type="number" id="setBeedisPerBox" class="form-input" value="6000" min="100" required>
-                <div class="settings-note">300 கட்டுகள் × 20 = 6,000 பீடிகள்</div>
+                <input type="number" id="setBeedisPerBox" class="form-input" value="6000" min="100" required oninput="updateSettingsNotes()">
+                <div class="settings-note" id="noteBoxCuts">300 கட்டுகள் × 20 = 6,000 பீடிகள்</div>
               </div>
               <div class="form-group">
                 <label class="form-label" for="setCutsPerBox" data-i18n="cutsPerBoxSetting">1 கட்டைக்கு கட்டுகள் (Cuts per Box)</label>
-                <input type="number" id="setCutsPerBox" class="form-input" value="300" min="1" required>
+                <input type="number" id="setCutsPerBox" class="form-input" value="300" min="1" required oninput="updateSettingsNotes()">
                 <div class="settings-note">1 Box = 300 Cuts</div>
               </div>
             </div>
 
             <div class="form-group">
               <label class="form-label" for="setBeedisPerCut" data-i18n="beedisPerCutSetting">1 கட்டுக்கு பீடிகள் (Beedis per Cut)</label>
-              <input type="number" id="setBeedisPerCut" class="form-input" value="20" min="1" required>
+              <input type="number" id="setBeedisPerCut" class="form-input" value="20" min="1" required oninput="updateSettingsNotes()">
             </div>
 
             <div class="settings-section-divider">
@@ -94,13 +94,13 @@
             <div class="form-grid">
               <div class="form-group">
                 <label class="form-label" for="setSalaryPer1000" data-i18n="salaryPer1000Setting">தொழிலாளர் கூலி (₹)</label>
-                <input type="number" id="setSalaryPer1000" class="form-input" value="320" min="1" required>
-                <div class="settings-note">1 Box கூலி: ₹1,920</div>
+                <input type="number" id="setSalaryPer1000" class="form-input" value="320" min="1" required oninput="updateSettingsNotes()">
+                <div class="settings-note" id="noteBoxSalary">1 Box கூலி: ₹1,920</div>
               </div>
               <div class="form-group">
                 <label class="form-label" for="setRatePer1000" data-i18n="ratePer1000Setting">கம்பெனி Rate மதிப்பு (₹)</label>
-                <input type="number" id="setRatePer1000" class="form-input" value="340" min="1" required>
-                <div class="settings-note">1 Box மதிப்பு: ₹2,040</div>
+                <input type="number" id="setRatePer1000" class="form-input" value="340" min="1" required oninput="updateSettingsNotes()">
+                <div class="settings-note" id="noteBoxRate">1 Box மதிப்பு: ₹2,040</div>
               </div>
               <div class="form-group">
                 <label class="form-label" for="setCommissionPercent" data-i18n="commissionPercentSetting">கமிஷன் சதவீதம் (%)</label>
@@ -120,7 +120,8 @@
               </div>
               <div class="form-group">
                 <label class="form-label" for="setBagSize" data-i18n="bagSizeSetting">ஒரு பை அளவு (Bag Size in Grams)</label>
-                <input type="number" id="setBagSize" class="form-input" value="600" min="100" required>
+                <input type="number" id="setBagSize" class="form-input" value="550" min="100" required oninput="updateSettingsNotes()">
+                <div class="settings-note" id="noteBagSize">1 Bag = 550g (Tobacco Bag Tool-ல் பயன்படுத்தப்படும்)</div>
               </div>
             </div>
 
@@ -218,8 +219,8 @@
   </div>
 
   <!-- Scripts -->
-  <script src="/js/i18n.js"></script>
-  <script src="/js/common.js"></script>
-  <script src="/js/settings.js"></script>
+  <script src="/js/i18n.js?v=20260922-3"></script>
+  <script src="/js/common.js?v=20260922-3"></script>
+  <script src="/js/settings.js?v=20260922-3"></script>
 </body>
 </html>

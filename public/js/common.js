@@ -4,15 +4,32 @@
  */
 
 // Global Settings State
-window.appSettings = {
+const defaultAppSettings = {
   beedisPerBox: 6000,
   cutsPerBox: 300,
   beedisPerCut: 20,
-  tobaccoPer1000Grams: 600,
-  powderRatioPercent: 1.0,
+  tobaccoPer1000Grams: 550,
+  powderPer1000Grams: 200,
+  salaryPer1000: 320,
+  ratePer1000: 340,
+  commissionPercent: 0.10,
+  avgWastageKg: 2,
+  bagSizeGrams: 550,
+  lowStockThresholdKg: 5,
   ratePerBox: 2040,
   salaryPerBox: 1920,
   profitPerBox: 120
+};
+
+let cachedLocalSettings = null;
+try {
+  const stored = localStorage.getItem('tvs_app_settings');
+  if (stored) cachedLocalSettings = JSON.parse(stored);
+} catch (e) {}
+
+window.appSettings = {
+  ...defaultAppSettings,
+  ...(cachedLocalSettings || {})
 };
 
 function showConfirmDialog(message, title, confirmLabel, confirmClass = 'btn-danger') {
@@ -144,9 +161,84 @@ function updateThemeButtonUI(theme) {
   }
 }
 
+function showLogoutConfirmationModal() {
+  return new Promise((resolve) => {
+    const existing = document.getElementById('appLogoutModal');
+    if (existing) existing.remove();
+
+    const isEn = (localStorage.getItem('tvs_beedi_lang') || (typeof currentLanguage !== 'undefined' ? currentLanguage : 'ta')) === 'en';
+
+    const modal = document.createElement('div');
+    modal.id = 'appLogoutModal';
+    modal.className = 'modal-overlay active';
+    modal.style.zIndex = '9999';
+
+    modal.innerHTML = `
+      <div class="modal-dialog confirm-dialog logout-validation-dialog" role="dialog" aria-modal="true" aria-labelledby="logoutModalTitle" style="max-width: 440px; text-align: center; padding: 28px 24px; border-radius: 16px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.28); animation: modalPopIn 0.22s cubic-bezier(0.16, 1, 0.3, 1);">
+        <div style="width: 60px; height: 60px; margin: 0 auto 16px; border-radius: 50%; background: rgba(239, 68, 68, 0.12); display: flex; align-items: center; justify-content: center; font-size: 28px; border: 1.5px solid rgba(239, 68, 68, 0.3); box-shadow: 0 0 24px rgba(239, 68, 68, 0.15);">
+          🚪
+        </div>
+        <h3 id="logoutModalTitle" style="font-size: 19px; font-weight: 800; margin-bottom: 8px; color: var(--text-primary);">
+          ${isEn ? 'Confirm Sign Out' : 'வெளியேறுவதை உறுதிப்படுத்தவும்'}
+        </h3>
+        <p style="font-size: 14px; line-height: 1.55; color: var(--text-muted); margin-bottom: 14px;">
+          ${isEn 
+            ? 'Are you sure you want to log out of TVS Beedi Company system?' 
+            : 'TVS பீடி கம்பெனி உள் நிர்வாக தளத்திலிருந்து நிச்சயமாக வெளியேற விரும்புகிறீர்களா?'}
+        </p>
+        <div style="background: rgba(239, 68, 68, 0.06); border: 1px dashed rgba(239, 68, 68, 0.3); border-radius: 10px; padding: 10px 14px; font-size: 12.5px; color: var(--accent-red, #ef4444); margin-bottom: 22px; display: flex; align-items: center; justify-content: center; gap: 6px;">
+          <span>🔒</span>
+          <span>${isEn ? 'You will need your login password to sign in again.' : 'மீண்டும் அணுக உள்நுழைவு கடவுச்சொல் (Password) தேவைப்படும்.'}</span>
+        </div>
+        <div class="modal-actions-row" style="display: flex; gap: 12px; justify-content: center;">
+          <button type="button" class="btn-secondary logout-cancel-btn" style="flex: 1; min-height: 44px; font-size: 14px; font-weight: 600; border-radius: 10px; cursor: pointer;">
+            ${isEn ? 'Cancel' : 'ரத்து செய்'}
+          </button>
+          <button type="button" class="btn-danger logout-confirm-btn" style="flex: 1; min-height: 44px; font-size: 14px; font-weight: 700; border-radius: 10px; cursor: pointer; background: linear-gradient(135deg, #ef4444, #dc2626); box-shadow: 0 4px 14px rgba(220, 38, 38, 0.35);">
+            ${isEn ? 'Yes, Log Out' : 'ஆம், வெளியேறு'}
+          </button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    const close = (confirmed) => {
+      document.removeEventListener('keydown', onKey);
+      modal.remove();
+      resolve(confirmed);
+    };
+
+    const onKey = (e) => {
+      if (e.key === 'Escape') close(false);
+    };
+    document.addEventListener('keydown', onKey);
+
+    modal.querySelector('.logout-cancel-btn').addEventListener('click', () => close(false));
+    modal.querySelector('.logout-confirm-btn').addEventListener('click', () => close(true));
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) close(false);
+    });
+
+    // Auto-focus cancel button for safe keyboard interaction
+    setTimeout(() => {
+      const cancelBtn = modal.querySelector('.logout-cancel-btn');
+      if (cancelBtn) cancelBtn.focus();
+    }, 40);
+  });
+}
+
 async function logout() {
+  const confirmed = await showLogoutConfirmationModal();
+  if (!confirmed) return;
+
   const button = document.getElementById('logoutBtn');
-  if (button) button.disabled = true;
+  if (button) {
+    button.disabled = true;
+    const isEn = (localStorage.getItem('tvs_beedi_lang') || (typeof currentLanguage !== 'undefined' ? currentLanguage : 'ta')) === 'en';
+    button.textContent = isEn ? 'Logging out...' : 'வெளியேறுகிறது...';
+  }
+
   try {
     await fetch('/api/auth/logout', { method: 'POST' });
   } finally {
@@ -154,6 +246,7 @@ async function logout() {
   }
 }
 
+window.showLogoutConfirmationModal = showLogoutConfirmationModal;
 window.logout = logout;
 
 // Attach globally
@@ -270,19 +363,42 @@ async function fetchAppSettings() {
     const res = await fetch('/api/settings');
     if (res.ok) {
       const data = await res.json();
-      if (data && data.settings) {
+      const s = (data && data.settings) ? data.settings : data;
+      if (s && typeof s === 'object') {
         window.appSettings = {
           ...window.appSettings,
-          ...data.settings
+          ...s
         };
-        // Trigger event so individual page scripts can respond if needed
+        try {
+          localStorage.setItem('tvs_app_settings', JSON.stringify(window.appSettings));
+        } catch (e) {}
+        if (typeof applyTranslations === 'function') {
+          applyTranslations();
+        }
+        if (typeof updateProductionPreviewLabels === 'function') {
+          updateProductionPreviewLabels();
+        }
+        // Trigger event so individual page scripts can respond immediately
         window.dispatchEvent(new CustomEvent('settingsLoaded', { detail: window.appSettings }));
       }
     }
   } catch (err) {
-    console.warn('Could not load settings from server, using defaults:', err);
+    console.warn('Could not load settings from server, using current settings:', err);
   }
 }
+
+// Storage sync across tabs
+window.addEventListener('storage', (event) => {
+  if (event.key === 'tvs_app_settings' && event.newValue) {
+    try {
+      const updated = JSON.parse(event.newValue);
+      window.appSettings = { ...window.appSettings, ...updated };
+      if (typeof applyTranslations === 'function') applyTranslations();
+      if (typeof updateProductionPreviewLabels === 'function') updateProductionPreviewLabels();
+      window.dispatchEvent(new CustomEvent('settingsLoaded', { detail: window.appSettings }));
+    } catch (e) {}
+  }
+});
 
 // 7. Initialize Global Listeners on DOM Ready
 document.addEventListener('DOMContentLoaded', () => {

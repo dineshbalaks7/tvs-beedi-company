@@ -81,7 +81,36 @@ function getProfitMetrics(summary) {
   return { profitWithoutCommission, commissionAmount, totalProfit };
 }
 
+function updateDashboardRatios() {
+  const isEn = (typeof currentLanguage !== 'undefined' && currentLanguage === 'en');
+  const beedisPerBox = window.appSettings?.beedisPerBox || 6000;
+  const tobaccoPer1000 = window.appSettings?.tobaccoPer1000Grams || 600;
+  const powderPer1000 = window.appSettings?.powderPer1000Grams || 200;
+
+  const beedisRatioEl = document.getElementById('dashTodayBeedisRatio');
+  if (beedisRatioEl) {
+    beedisRatioEl.textContent = isEn
+      ? `1 Box = ${formatNumber(beedisPerBox)} Beedis`
+      : `1 கட்டை = ${formatNumber(beedisPerBox)} பீடிகள்`;
+  }
+
+  const tobaccoRatioEl = document.getElementById('dashTodayTobaccoRatio');
+  if (tobaccoRatioEl) {
+    tobaccoRatioEl.textContent = isEn
+      ? `${tobaccoPer1000}g / 1,000 Beedis`
+      : `${tobaccoPer1000}g / 1,000 பீடி`;
+  }
+
+  const powderRatioEl = document.getElementById('dashTodayPowderRatio');
+  if (powderRatioEl) {
+    powderRatioEl.textContent = isEn
+      ? `${powderPer1000}g / 1,000 Beedis`
+      : `${powderPer1000}g / 1,000 பீடி`;
+  }
+}
+
 function updateDashboardPeriodPills() {
+  updateDashboardRatios();
   const isEn = (typeof currentLanguage !== 'undefined' && currentLanguage === 'en');
   const btnDay = document.getElementById('btnPeriodDay');
   const btnWeek = document.getElementById('btnPeriodWeek');
@@ -163,6 +192,13 @@ async function loadDashboardAnalytics(period = 'day') {
     if (!res.ok) throw new Error('Failed to load dashboard data');
     const data = await res.json();
     if (requestId !== dashboardRequestId || period !== currentDashboardPeriod) return;
+    if (data && data.settings) {
+      window.appSettings = { ...window.appSettings, ...data.settings };
+      try {
+        localStorage.setItem('tvs_app_settings', JSON.stringify(window.appSettings));
+      } catch (e) {}
+      updateDashboardRatios();
+    }
     cachedAnalytics = data;
     renderDashboardUI(data);
     await renderDashboardCharts(data);
@@ -1299,7 +1335,15 @@ window.addEventListener('languageChanged', () => {
   }
 });
 
+window.addEventListener('settingsLoaded', () => {
+  updateDashboardRatios();
+  if (cachedAnalytics) {
+    renderDashboardUI(cachedAnalytics);
+  }
+});
+
 // Initialization
 document.addEventListener('DOMContentLoaded', () => {
+  updateDashboardRatios();
   setDashboardPeriod('day');
 });

@@ -139,6 +139,9 @@
               <div class="calc-preview-title">
                 <span>⚡</span> <span data-i18n="calcPreviewTitle">உடனடி நேரடி கணக்கீடு (Live Preview)</span>
               </div>
+              <div id="calcPreviewRatios" class="calc-preview-ratios-banner" style="font-size: 11.5px; color: var(--accent-orange, #d97706); margin-bottom: 10px; font-weight: 600; padding: 4px 8px; background: rgba(217, 119, 6, 0.08); border-radius: 6px; display: inline-block;">
+                விகிதங்கள்: 1,000 பீடிக்கு 550g Tobacco • 200g தூள் • ₹320 கூலி • ₹340 Rate
+              </div>
               <div class="calc-chips-grid">
                 <div class="calc-chip">
                   <span class="calc-chip-label" data-i18n="calcBoxes">கட்டை (Boxes)</span>
@@ -153,19 +156,19 @@
                   <span class="calc-chip-val" id="prevBeedis">0</span>
                 </div>
                 <div class="calc-chip">
-                  <span class="calc-chip-label" data-i18n="calcTobacco">Tobacco பயன்பாடு</span>
+                  <span class="calc-chip-label" id="calcTobaccoLabel" data-i18n="calcTobacco">Tobacco பயன்பாடு (550g/1,000)</span>
                   <span class="calc-chip-val" id="prevTobacco">0 g</span>
                 </div>
                 <div class="calc-chip">
-                  <span class="calc-chip-label" data-i18n="calcPowder">தூள் பயன்பாடு</span>
+                  <span class="calc-chip-label" id="calcPowderLabel" data-i18n="calcPowder">தூள் பயன்பாடு (200g/1,000)</span>
                   <span class="calc-chip-val" id="prevPowder">0 g</span>
                 </div>
                 <div class="calc-chip highlight">
-                  <span class="calc-chip-label" data-i18n="calcSalary">கூலி மதிப்பு (₹1,920/Bx)</span>
+                  <span class="calc-chip-label" id="calcSalaryLabel" data-i18n="calcSalary">கூலி மதிப்பு (₹1,920/Bx)</span>
                   <span class="calc-chip-val" id="prevSalary">₹0</span>
                 </div>
                 <div class="calc-chip highlight-rate">
-                  <span class="calc-chip-label" data-i18n="calcRate">Rate மதிப்பு (₹2,040/Bx)</span>
+                  <span class="calc-chip-label" id="calcRateLabel" data-i18n="calcRate">Rate மதிப்பு (₹2,040/Bx)</span>
                   <span class="calc-chip-val" id="prevRate">₹0</span>
                 </div>
                 <div class="calc-chip">
@@ -359,8 +362,8 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="/js/html2pdf.bundle.min.js"></script>
   <script src="/js/chart.umd.min.js"></script>
-  <script src="/js/i18n.js"></script>
-  <script src="/js/common.js"></script>
-  <script src="/js/production.js"></script>
+  <script src="/js/i18n.js?v=20260921-2"></script>
+  <script src="/js/common.js?v=20260921-2"></script>
+  <script src="/js/production.js?v=20260921-2"></script>
 </body>
 </html>

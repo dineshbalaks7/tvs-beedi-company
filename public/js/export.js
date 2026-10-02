@@ -1355,6 +1355,19 @@ window.addEventListener('languageChanged', () => {
   renderExportBarChart(currentExportChartGranularity);
 });
 
+window.addEventListener('settingsLoaded', () => {
+  const boxesInput = document.getElementById('expBoxes');
+  const cutsInput = document.getElementById('expCuts');
+  if (boxesInput && boxesInput.value) {
+    handleExportBoxesInput(boxesInput.value);
+  } else if (cutsInput && cutsInput.value) {
+    handleExportCutsInput(cutsInput.value);
+  }
+  if (cachedExports) {
+    renderExportUI(cachedExports);
+  }
+});
+
 document.addEventListener('DOMContentLoaded', () => {
   updateSummarySelectionControls();
   loadExportData();

@@ -18,7 +18,11 @@ function calculateProductionMetrics(input, settings = {}) {
   let beedis = 0;
 
   if (typeof input === 'object' && input !== null) {
-    if (input.boxes !== undefined && input.boxes !== null && input.boxes !== '') {
+    if (input.beedis !== undefined && input.beedis !== null && input.beedis !== '' && (input.boxes === undefined || input.boxes === null || input.boxes === '')) {
+      beedis = Number(input.beedis) || 0;
+      boxes = beedisPerBox > 0 ? Number((beedis / beedisPerBox).toFixed(2)) : 0;
+      cuts = beedisPerCut > 0 ? Math.round(beedis / beedisPerCut) : 0;
+    } else if (input.boxes !== undefined && input.boxes !== null && input.boxes !== '') {
       boxes = Number(input.boxes) || 0;
       cuts = (input.cuts !== undefined && input.cuts !== null && input.cuts !== '')
         ? Number(input.cuts)
@@ -28,6 +32,10 @@ function calculateProductionMetrics(input, settings = {}) {
       cuts = Number(input.cuts) || 0;
       boxes = Number((cuts / cutsPerBox).toFixed(2));
       beedis = Math.round(cuts * beedisPerCut);
+    } else if (input.beedis !== undefined && input.beedis !== null && input.beedis !== '') {
+      beedis = Number(input.beedis) || 0;
+      boxes = beedisPerBox > 0 ? Number((beedis / beedisPerBox).toFixed(2)) : 0;
+      cuts = beedisPerCut > 0 ? Math.round(beedis / beedisPerCut) : 0;
     }
   } else {
     // If a number is passed directly:
@@ -76,7 +84,7 @@ function calculateProductionMetrics(input, settings = {}) {
 
 function calculateBags(tobaccoKg, wastageKg = null, bagSizeGrams = null, settings = {}) {
   const wastage = wastageKg !== null ? Number(wastageKg) : (settings.avgWastageKg ?? 2);
-  const bagSize = bagSizeGrams !== null ? Number(bagSizeGrams) : (settings.bagSizeGrams ?? 600);
+  const bagSize = bagSizeGrams !== null ? Number(bagSizeGrams) : (settings.bagSizeGrams || settings.tobaccoPer1000Grams || 550);
 
   const initialGrams = tobaccoKg * 1000;
   const wastageGrams = wastage * 1000;

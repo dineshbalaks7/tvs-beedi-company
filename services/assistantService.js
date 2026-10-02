@@ -279,46 +279,100 @@ async function processChatMessage(queryText, sessionId = 'default') {
     return { reply: (lang === 'en') ? replyEn : replyTa, language: lang };
   }
 
-  // 5. Intent: Requirement calculation for boxes or cuts
-  // e.g.: "1 கட்டை போட்டா எவ்வளவு tobacco தேவை?" / "100 cut போட்டா எவ்வளவு tobacco தேவை?" / "Requirements for 1 box"
+  // 5. Intent: Requirement calculation for boxes, cuts, or beedis
+  // e.g.: "1 கட்டை போட்டா எவ்வளவு tobacco தேவை?" / "100 cut போட்டா எவ்வளவு tobacco தேவை?" / "Requirements for 1 box" / "tobacoo required for 1000 beedi"
   const boxReqMatch = text.match(/(\d+(?:\.\d+)?)\s*(?:box|boxes|கட்டை)/i);
   const cutReqMatch = text.match(/(\d+(?:\.\d+)?)\s*(?:cut|cuts|கட்டு)/i);
+  const beediReqMatch = text.match(/(\d[\d,]*)\s*(?:beedi|beedis|beedies|பீடி|பீடிகள்)/i);
 
-  if ((boxReqMatch || cutReqMatch) && (lower.includes('thevai') || lower.includes('தேவை') || lower.includes('need') || lower.includes('how much') || lower.includes('எவ்வளவு') || lower.includes('evlo'))) {
+  const isRequirementQuery = lower.includes('thevai') || lower.includes('தேவை') || lower.includes('need') ||
+    lower.includes('how much') || lower.includes('எவ்வளவு') || lower.includes('evlo') ||
+    lower.includes('require') || lower.includes('requirement') || lower.includes('calc') ||
+    lower.includes('கணக்கீடு') || lower.includes('போட்டா') || lower.includes('potta') ||
+    lower.includes('tobacco') || lower.includes('tobacoo') || lower.includes('புகையிலை') ||
+    lower.includes('powder') || lower.includes('தூள்');
+
+  if ((boxReqMatch || cutReqMatch || beediReqMatch) && isRequirementQuery) {
     let boxes = 0;
     let cuts = 0;
+    let beedis = 0;
     const cutsPerBox = settings.cutsPerBox || 300;
+    const beedisPerBox = settings.beedisPerBox || 6000;
+    const beedisPerCut = settings.beedisPerCut || (beedisPerBox / cutsPerBox);
 
-    if (boxReqMatch) {
+    if (beediReqMatch) {
+      beedis = parseInt(beediReqMatch[1].replace(/,/g, ''), 10);
+      boxes = Number((beedis / beedisPerBox).toFixed(2));
+      cuts = beedisPerCut > 0 ? Math.round(beedis / beedisPerCut) : 0;
+    } else if (boxReqMatch) {
       boxes = parseFloat(boxReqMatch[1]);
       cuts = Math.round(boxes * cutsPerBox);
-    } else {
+      beedis = Math.round(boxes * beedisPerBox);
+    } else if (cutReqMatch) {
       cuts = parseFloat(cutReqMatch[1]);
       boxes = cuts > 0 ? Number((cuts / cutsPerBox).toFixed(2)) : 0;
+      beedis = Math.round(cuts * beedisPerCut);
     }
 
-    const metrics = calculateProductionMetrics({ boxes, cuts }, settings);
+    const metrics = beediReqMatch
+      ? calculateProductionMetrics({ beedis }, settings)
+      : calculateProductionMetrics({ boxes, cuts }, settings);
 
-    const unitLabelTa = boxReqMatch ? `${boxes} கட்டை (Boxes)` : `${cuts} கட்டு (Cuts)`;
-    const unitLabelEn = boxReqMatch ? `${boxes} Boxes` : `${cuts} Cuts`;
+    const unitLabelTa = beediReqMatch ? `${beedis.toLocaleString('en-IN')} பீடிகள் (Beedis)` : (boxReqMatch ? `${boxes} கட்டை (Boxes)` : `${cuts} கட்டு (Cuts)`);
+    const unitLabelEn = beediReqMatch ? `${beedis.toLocaleString('en-IN')} Beedis` : (boxReqMatch ? `${boxes} Boxes` : `${cuts} Cuts`);
 
-    const replyTa = `**${unitLabelTa} உற்பத்தி தேவைகள்:**\n\n` +
-      `• கட்டை / கட்டுகள்: **${metrics.boxes} கட்டை = ${metrics.cuts} கட்டுகள்**\n` +
+    const replyTa = `**${unitLabelTa} உற்பத்தி தேவைகள் (தற்போதைய அமைப்புகளின்படி):**\n\n` +
       `• பீடிகள் எண்ணிக்கை: **${metrics.beedis.toLocaleString('en-IN')} பீடிகள்**\n` +
-      `• தேவைப்படும் Tobacco: **${metrics.tobaccoUsedKg} kg** (${metrics.tobaccoUsedGrams} g)\n` +
-      `• தேவைப்படும் Powder (தூள்): **${metrics.powderUsedKg} kg** (${metrics.powderUsedGrams} g)\n` +
-      `• கூலி / Salary: **${formatRupees(metrics.salary)}**\n` +
-      `• Rate மதிப்பு: **${formatRupees(metrics.rate)}**\n` +
-      `• லாபம் (Rate − கூலி): **${formatRupees(metrics.profit)}** (${formatRupees(settings.marginPerBox || 120)}/கட்டை)`;
+      `• கட்டை / கட்டுகள்: **${metrics.boxes} கட்டை = ${metrics.cuts} கட்டுகள்**\n` +
+      `• தேவைப்படும் Tobacco: **${metrics.tobaccoUsedGrams} g** (${metrics.tobaccoUsedKg} kg) *(விகிதம்: 1,000-க்கு ${settings.tobaccoPer1000Grams || 600}g)*\n` +
+      `• தேவைப்படும் Powder (தூள்): **${metrics.powderUsedGrams} g** (${metrics.powderUsedKg} kg) *(விகிதம்: 1,000-க்கு ${settings.powderPer1000Grams || 200}g)*\n` +
+      `• கூலி / Salary: **${formatRupees(metrics.salary)}** *(1,000-க்கு ₹${settings.salaryPer1000 || 320})*\n` +
+      `• Rate மதிப்பு: **${formatRupees(metrics.rate)}** *(1,000-க்கு ₹${settings.ratePer1000 || 340})*\n` +
+      `• லாபம் (Rate − கூலி): **${formatRupees(metrics.profit)}**`;
 
-    const replyEn = `**Requirements for ${unitLabelEn}:**\n\n` +
-      `• Boxes / Cuts: **${metrics.boxes} Boxes = ${metrics.cuts} Cuts**\n` +
+    const replyEn = `**Requirements for ${unitLabelEn} (According to Active Settings):**\n\n` +
       `• Beedis: **${metrics.beedis.toLocaleString('en-IN')}**\n` +
-      `• Tobacco Required: **${metrics.tobaccoUsedKg} kg** (${metrics.tobaccoUsedGrams} g)\n` +
-      `• Powder Required: **${metrics.powderUsedKg} kg** (${metrics.powderUsedGrams} g)\n` +
-      `• Salary: **${formatRupees(metrics.salary)}**\n` +
-      `• Rate: **${formatRupees(metrics.rate)}**\n` +
-      `• Profit (Rate − Salary): **${formatRupees(metrics.profit)}** (${formatRupees(settings.marginPerBox || 120)}/Box)`;
+      `• Boxes / Cuts: **${metrics.boxes} Boxes = ${metrics.cuts} Cuts**\n` +
+      `• Tobacco Required: **${metrics.tobaccoUsedGrams} g** (${metrics.tobaccoUsedKg} kg) *(Ratio: ${settings.tobaccoPer1000Grams || 600}g per 1,000 beedis)*\n` +
+      `• Powder Required: **${metrics.powderUsedGrams} g** (${metrics.powderUsedKg} kg) *(Ratio: ${settings.powderPer1000Grams || 200}g per 1,000 beedis)*\n` +
+      `• Salary: **${formatRupees(metrics.salary)}** *(₹${settings.salaryPer1000 || 320} per 1,000)*\n` +
+      `• Rate: **${formatRupees(metrics.rate)}** *(₹${settings.ratePer1000 || 340} per 1,000)*\n` +
+      `• Profit (Rate − Salary): **${formatRupees(metrics.profit)}**`;
+
+    return { reply: (lang === 'en') ? replyEn : replyTa, language: lang };
+  }
+
+  // 5c. Intent: Current Active Settings / Calculation Metrics Query
+  // e.g.: "settings", "அமைப்புகள்", "tobacco ratio", "calculation settings", "active settings", "tobacco per 1000"
+  if (lower.includes('setting') || lower.includes('அமைப்பு') || lower.includes('metric') ||
+      (lower.includes('ratio') && (lower.includes('tobacco') || lower.includes('powder') || lower.includes('விகிதம்'))) ||
+      ((lower.includes('tobacco') || lower.includes('tobacoo') || lower.includes('புகையிலை')) && (lower.includes('1000') || lower.includes('gram') || lower.includes('கிராம்')) && !boxReqMatch && !cutReqMatch && !beediReqMatch)) {
+    const tobaccoPer1000 = settings.tobaccoPer1000Grams || 600;
+    const powderPer1000 = settings.powderPer1000Grams || 200;
+    const salaryPer1000 = settings.salaryPer1000 || 320;
+    const ratePer1000 = settings.ratePer1000 || 340;
+    const beedisPerBox = settings.beedisPerBox || 6000;
+    const cutsPerBox = settings.cutsPerBox || 300;
+    const bagSize = settings.bagSizeGrams || 600;
+    const wastage = settings.avgWastageKg ?? 2;
+
+    const replyTa = `⚙️ **தற்போதைய கணக்கீட்டு அமைப்புகள் (Active Settings):**\n\n` +
+      `• **Tobacco (1,000 பீடிக்கு):** **${tobaccoPer1000} கிராம் (g)**\n` +
+      `• **Powder / தூள் (1,000 பீடிக்கு):** **${powderPer1000} கிராம் (g)**\n` +
+      `• **தொழிலாளர் கூலி (Salary):** **₹${salaryPer1000}** / 1,000 பீடி\n` +
+      `• **Rate மதிப்பு (கம்பெனி வரவு):** **₹${ratePer1000}** / 1,000 பீடி\n` +
+      `• **கட்டை அமைப்பு:** 1 Box = ${cutsPerBox} கட்டுகள் = ${beedisPerBox.toLocaleString('en-IN')} பீடிகள்\n` +
+      `• **Tobacco Bag அளவு:** ${bagSize} கிராம் (Wastage: ${wastage} kg/35kg)\n\n` +
+      `💡 *அனைத்து புதிய கணக்கீடுகளும் இந்த அமைப்புகளின்படியே செய்யப்படுகின்றன.*`;
+
+    const replyEn = `⚙️ **Current Active Calculation Settings:**\n\n` +
+      `• **Tobacco per 1,000 Beedis:** **${tobaccoPer1000} g**\n` +
+      `• **Powder per 1,000 Beedis:** **${powderPer1000} g**\n` +
+      `• **Labor Salary (கூலி):** **₹${salaryPer1000}** per 1,000 beedis\n` +
+      `• **Rate Value:** **₹${ratePer1000}** per 1,000 beedis\n` +
+      `• **Box Configuration:** 1 Box = ${cutsPerBox} Cuts = ${beedisPerBox.toLocaleString('en-IN')} Beedis\n` +
+      `• **Tobacco Bag Size:** ${bagSize} g (Wastage: ${wastage} kg/35kg)\n\n` +
+      `💡 *All calculations strictly follow these saved settings.*`;
 
     return { reply: (lang === 'en') ? replyEn : replyTa, language: lang };
   }

@@ -8,6 +8,7 @@ const Stock = require('../models/Stock');
 const StockMovement = require('../models/StockMovement');
 const Settings = require('../models/Settings');
 const Production = require('../models/Production');
+const Export = require('../models/Export');
 
 async function getStockSummary() {
   const tobaccoStock = await Stock.getStock('tobacco');
@@ -20,12 +21,14 @@ async function getStockSummary() {
 
   // Consumption Reporting (Today, This Week, This Month, All Time)
   const now = new Date();
-  const todayStart = new Date(now); todayStart.setHours(0, 0, 0, 0);
-  const weekStart = new Date(now); weekStart.setDate(now.getDate() - 6); weekStart.setHours(0, 0, 0, 0);
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+  const dateStr = now.toISOString().split('T')[0];
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const minTodayStart = new Date(Math.min(new Date(Date.UTC(y, m - 1, d, 0, 0, 0, 0)).getTime(), new Date(y, m - 1, d, 0, 0, 0, 0).getTime()));
+  const weekStart = new Date(minTodayStart); weekStart.setDate(weekStart.getDate() - 6);
+  const monthStart = new Date(y, m - 1, 1, 0, 0, 0, 0);
 
   const [prodsToday, prodsWeek, prodsMonth, allProds] = await Promise.all([
-    Production.find({ date: { $gte: todayStart } }),
+    Production.find({ date: { $gte: minTodayStart } }),
     Production.find({ date: { $gte: weekStart } }),
     Production.find({ date: { $gte: monthStart } }),
     Production.find()
@@ -70,46 +73,98 @@ async function getStockSummary() {
   };
 }
 
-async function recordStockUsage(tobaccoUsedGrams, powderUsedGrams, productionId = null, notes = '') {
-  // Production usage is an audit trail only. Production must not alter the
-  // manually maintained physical stock balance.
+// =========================================================================
+// Strict Chronological Stock Reconciliation
+// Ensures back-dated incoming stock, usages, and edits recalculate all subsequent
+// running balances and update the physical in-hand stock strictly.
+// =========================================================================
+async function recalculateStockLedger(item = null) {
+  const items = item ? [item] : ['tobacco', 'powder'];
+
+  for (const it of items) {
+    const movements = await StockMovement.find({ item: it });
+
+    // Deterministic chronological ordering:
+    // 1. Calendar date YYYY-MM-DD ascending
+    // 2. Incoming stock / additions first on that day, followed by usage, then adjustments
+    // 3. Exact createdAt timestamp
+    const typePriority = (m) => {
+      if (m.type === 'initial') return 1;
+      if (m.type === 'added') return 2;
+      if (m.type === 'adjustment' && m.quantityGrams > 0) return 3;
+      if (m.type === 'production_usage') return 4;
+      return 5;
+    };
+
+    movements.sort((a, b) => {
+      const dateA = (a.date ? new Date(a.date) : new Date(a.createdAt)).toISOString().slice(0, 10);
+      const dateB = (b.date ? new Date(b.date) : new Date(b.createdAt)).toISOString().slice(0, 10);
+      if (dateA !== dateB) return dateA.localeCompare(dateB);
+
+      const pA = typePriority(a);
+      const pB = typePriority(b);
+      if (pA !== pB) return pA - pB;
+
+      const timeA = new Date(a.createdAt || a.date).getTime();
+      const timeB = new Date(b.createdAt || b.date).getTime();
+      return timeA - timeB;
+    });
+
+    let runningBalance = 0;
+    for (const mov of movements) {
+      runningBalance = Math.max(0, runningBalance + (mov.quantityGrams || 0));
+      if (mov.balanceAfterGrams !== runningBalance) {
+        mov.balanceAfterGrams = runningBalance;
+        await mov.save();
+      }
+    }
+
+    // Update physical Stock document to match true final in-hand balance
+    const stockDoc = await Stock.getStock(it);
+    stockDoc.quantityGrams = runningBalance;
+    stockDoc.lastUpdated = new Date();
+    await stockDoc.save();
+  }
+}
+
+async function recordStockUsage(tobaccoUsedGrams, powderUsedGrams, productionId = null, notes = '', productionDate = null) {
   const tobaccoDeduct = Math.round(Number(tobaccoUsedGrams) || 0);
-  const tobaccoStock = await Stock.getStock('tobacco');
+  const powderDeduct = Math.round(Number(powderUsedGrams) || 0);
+  const movementDate = productionDate ? new Date(productionDate) : new Date();
+
   if (tobaccoDeduct > 0) {
     await StockMovement.create({
       item: 'tobacco',
       type: 'production_usage',
       quantityGrams: -tobaccoDeduct,
-      balanceAfterGrams: tobaccoStock.quantityGrams,
+      balanceAfterGrams: 0, // Will be set strictly by recalculateStockLedger
       referenceId: productionId,
-      notes: notes || `Production consumed: ${tobaccoDeduct}g Tobacco`
+      notes: notes || `Production consumed: ${tobaccoDeduct}g Tobacco`,
+      date: movementDate
     });
   }
 
-  // Keep the same audit behavior for powder without changing its balance.
-  const powderDeduct = Math.round(Number(powderUsedGrams) || 0);
-  const powderStock = await Stock.getStock('powder');
   if (powderDeduct > 0) {
     await StockMovement.create({
       item: 'powder',
       type: 'production_usage',
       quantityGrams: -powderDeduct,
-      balanceAfterGrams: powderStock.quantityGrams,
+      balanceAfterGrams: 0, // Will be set strictly by recalculateStockLedger
       referenceId: productionId,
-      notes: notes || `Production consumed: ${powderDeduct}g Powder (தூள்)`
+      notes: notes || `Production consumed: ${powderDeduct}g Powder (தூள்)`,
+      date: movementDate
     });
   }
 
+  await recalculateStockLedger();
+
+  const tobaccoStock = await Stock.getStock('tobacco');
+  const powderStock = await Stock.getStock('powder');
   return { tobaccoStock, powderStock };
 }
 
 async function addStock(item, quantityKg, notes = '', date = null) {
   const gramsToAdd = Math.round(quantityKg * 1000);
-  const stock = await Stock.getStock(item);
-  stock.quantityGrams += gramsToAdd;
-  stock.lastUpdated = new Date();
-  await stock.save();
-
   const cleanNotes = (notes && notes.trim()) ? notes.trim() : (item === 'powder' ? '------' : '');
   const movementDate = date ? new Date(date) : new Date();
 
@@ -117,35 +172,69 @@ async function addStock(item, quantityKg, notes = '', date = null) {
     item,
     type: 'added',
     quantityGrams: gramsToAdd,
-    balanceAfterGrams: stock.quantityGrams,
+    balanceAfterGrams: 0, // Reconciled chronologically
     variety: cleanNotes,
     notes: cleanNotes,
     date: movementDate
   });
 
-  return { stock, movement };
+  // Recompute entire timeline so back-dated stock updates all subsequent usages
+  await recalculateStockLedger(item);
+
+  const stock = await Stock.getStock(item);
+  const refreshedMovement = await StockMovement.findById(movement._id);
+  return { stock, movement: refreshedMovement || movement };
 }
 
-async function adjustStock(item, newQuantityKg, notes = '') {
+async function adjustStock(item, newQuantityKg, notes = '', date = null) {
   const newGrams = Math.round(newQuantityKg * 1000);
   const stock = await Stock.getStock(item);
   const difference = newGrams - stock.quantityGrams;
-  stock.quantityGrams = newGrams;
-  stock.lastUpdated = new Date();
-  await stock.save();
-
   const cleanNotes = (notes && notes.trim()) ? notes.trim() : (item === 'powder' ? '------' : '');
+  const movementDate = date ? new Date(date) : new Date();
 
   const movement = await StockMovement.create({
     item,
     type: 'adjustment',
     quantityGrams: difference,
-    balanceAfterGrams: stock.quantityGrams,
+    balanceAfterGrams: newGrams,
     variety: cleanNotes,
-    notes: cleanNotes
+    notes: cleanNotes,
+    date: movementDate
   });
 
-  return { stock, movement };
+  await recalculateStockLedger(item);
+
+  const updatedStock = await Stock.getStock(item);
+  const refreshedMovement = await StockMovement.findById(movement._id);
+  return { stock: updatedStock, movement: refreshedMovement || movement };
+}
+
+async function deductStockWastage(item, quantityKg, notes = '', date = null) {
+  const kg = Number(quantityKg);
+  if (!['tobacco', 'powder'].includes(item) || !kg || kg <= 0) {
+    throw new Error('Valid item and wastage quantity required');
+  }
+
+  const gramsToDeduct = Math.round(kg * 1000);
+  const cleanNotes = (notes && notes.trim()) ? notes.trim() : (item === 'powder' ? 'தூள் கழிவு (Wastage)' : 'இலை கழிவு (Wastage)');
+  const movementDate = date ? new Date(date) : new Date();
+
+  const movement = await StockMovement.create({
+    item,
+    type: 'wastage',
+    quantityGrams: -gramsToDeduct,
+    balanceAfterGrams: 0,
+    variety: cleanNotes,
+    notes: cleanNotes,
+    date: movementDate
+  });
+
+  await recalculateStockLedger(item);
+
+  const stock = await Stock.getStock(item);
+  const refreshedMovement = await StockMovement.findById(movement._id);
+  return { stock, movement: refreshedMovement || movement };
 }
 
 async function deleteStockMovement(movementId) {
@@ -154,26 +243,13 @@ async function deleteStockMovement(movementId) {
     throw new Error('Stock movement record not found');
   }
 
-  const stock = await Stock.getStock(movement.item);
-
-  if (movement.referenceId || movement.type === 'production_usage') {
-    await StockMovement.findByIdAndDelete(movementId);
-    return { success: true, stock, auditOnly: true };
-  }
-
-  // Reverse this movement from current stock
-  if (movement.quantityGrams > 0) {
-    // Was addition, so subtract it
-    stock.quantityGrams = Math.max(0, stock.quantityGrams - movement.quantityGrams);
-  } else if (movement.quantityGrams < 0) {
-    // Was usage/deduction, so add it back
-    stock.quantityGrams += Math.abs(movement.quantityGrams);
-  }
-
-  stock.lastUpdated = new Date();
-  await stock.save();
-
+  const item = movement.item;
   await StockMovement.findByIdAndDelete(movementId);
+
+  // Recalculate timeline after removing this movement
+  await recalculateStockLedger(item);
+
+  const stock = await Stock.getStock(item);
   return { success: true, stock };
 }
 
@@ -183,26 +259,9 @@ async function editStockMovement(movementId, { quantityKg, notes, date }) {
     throw new Error('Stock movement record not found');
   }
 
-  const stock = await Stock.getStock(movement.item);
-
-  if (movement.referenceId || movement.type === 'production_usage') {
-    if (notes !== undefined) movement.notes = notes;
-    if (date) movement.date = new Date(date);
-    await movement.save();
-    return { success: true, movement, stock, auditOnly: true };
-  }
-
   if (quantityKg !== undefined && quantityKg !== null && quantityKg !== '') {
     const rawKg = Math.abs(Number(quantityKg));
-    const newGrams = (movement.quantityGrams >= 0) ? Math.round(rawKg * 1000) : -Math.round(rawKg * 1000);
-    const delta = newGrams - movement.quantityGrams;
-
-    stock.quantityGrams = Math.max(0, stock.quantityGrams + delta);
-    stock.lastUpdated = new Date();
-    await stock.save();
-
-    movement.quantityGrams = newGrams;
-    movement.balanceAfterGrams = stock.quantityGrams;
+    movement.quantityGrams = (movement.quantityGrams >= 0) ? Math.round(rawKg * 1000) : -Math.round(rawKg * 1000);
   }
 
   if (notes !== undefined) {
@@ -214,14 +273,43 @@ async function editStockMovement(movementId, { quantityKg, notes, date }) {
   }
 
   await movement.save();
-  return { success: true, movement, stock };
+
+  // Recalculate timeline with updated date/quantity
+  await recalculateStockLedger(movement.item);
+
+  const stock = await Stock.getStock(movement.item);
+  const refreshedMovement = await StockMovement.findById(movementId);
+  return { success: true, movement: refreshedMovement || movement, stock };
 }
 
-async function getRecentMovements(limit = 20) {
-  return StockMovement.find()
-    .sort({ date: -1, createdAt: -1 })
-    .limit(limit)
-    .populate('referenceId');
+async function getRecentMovements(limit = 50) {
+  const movements = await StockMovement.find().populate('referenceId');
+
+  const typePriority = (m) => {
+    if (m.type === 'initial') return 1;
+    if (m.type === 'added') return 2;
+    if (m.type === 'adjustment' && m.quantityGrams > 0) return 3;
+    if (m.type === 'production_usage') return 4;
+    return 5;
+  };
+
+  // Descending sort for the ledger display: newest date on top
+  // For same date: usages display on top of additions, with additions below (chronological bottom-to-top flow)
+  movements.sort((a, b) => {
+    const dateA = (a.date ? new Date(a.date) : new Date(a.createdAt)).toISOString().slice(0, 10);
+    const dateB = (b.date ? new Date(b.date) : new Date(b.createdAt)).toISOString().slice(0, 10);
+    if (dateA !== dateB) return dateB.localeCompare(dateA);
+
+    const pA = typePriority(a);
+    const pB = typePriority(b);
+    if (pA !== pB) return pB - pA;
+
+    const timeA = new Date(a.createdAt || a.date).getTime();
+    const timeB = new Date(b.createdAt || b.date).getTime();
+    return timeB - timeA;
+  });
+
+  return movements.slice(0, limit);
 }
 
 async function getStockReport(params = {}) {
@@ -401,8 +489,9 @@ async function getStockReport(params = {}) {
       }
     });
 
+    const cutsPerBoxVal = settings.cutsPerBox || 300;
     const mCuts = mProds.reduce((s, p) => s + (p.cuts || 0), 0);
-    const mBoxes = mProds.reduce((s, p) => s + (p.boxes !== undefined && p.boxes !== null && p.boxes > 0 ? p.boxes : ((p.cuts || 0) / 300)), 0);
+    const mBoxes = mProds.reduce((s, p) => s + (p.boxes !== undefined && p.boxes !== null && p.boxes > 0 ? p.boxes : ((p.cuts || 0) / cutsPerBoxVal)), 0);
     const mBeedis = mProds.reduce((s, p) => s + (p.beedis || 0), 0);
 
     const mClosingTobaccoKg = Number((runningTobaccoBal / 1000).toFixed(2));
@@ -474,8 +563,9 @@ async function getStockReport(params = {}) {
   const periodClosingTobaccoGrams = runningTobaccoBal;
   const periodClosingPowderGrams = runningPowderBal;
 
+  const periodCutsPerBox = settings.cutsPerBox || 300;
   const totalCuts = allProductions.reduce((s, p) => s + (p.cuts || 0), 0);
-  const totalBoxes = allProductions.reduce((s, p) => s + (p.boxes !== undefined && p.boxes !== null && p.boxes > 0 ? p.boxes : ((p.cuts || 0) / 300)), 0);
+  const totalBoxes = allProductions.reduce((s, p) => s + (p.boxes !== undefined && p.boxes !== null && p.boxes > 0 ? p.boxes : ((p.cuts || 0) / periodCutsPerBox)), 0);
   const totalBeedis = allProductions.reduce((s, p) => s + (p.beedis || 0), 0);
 
   const closingTobaccoKg = Number((periodClosingTobaccoGrams / 1000).toFixed(2));
@@ -589,12 +679,15 @@ async function getIncomingStockReport(params = {}) {
   let itemFilter = (params.item || params.material || 'all').toLowerCase();
   if (itemFilter === 'leaf') itemFilter = 'tobacco';
 
-  // Only incoming stock movements (purchases / additions, excluding rolled back items from deleted productions)
+  const includeUsage = params.includeUsage === true || params.includeUsage === 'true' || params.includeProductionUsage === true || params.includeProductionUsage === 'true' || params.includeUsage === '1';
+
+  // Incoming stock movements (purchases / additions only, strictly manually added stock)
   const query = {
     date: { $gte: startDate, $lte: endDate },
     quantityGrams: { $gt: 0 },
-    type: { $in: ['added', 'initial', 'adjustment'] },
-    notes: { $not: /Restored from deleted production/i }
+    type: { $in: ['added', 'initial'] },
+    notes: { $not: /Production/i },
+    referenceId: null
   };
 
   if (itemFilter === 'tobacco' || itemFilter === 'powder') {
@@ -610,12 +703,15 @@ async function getIncomingStockReport(params = {}) {
     query.$or = [{ notes: /SUPER/i }, { variety: /SUPER/i }];
   }
 
-  const movements = await StockMovement.find(query).sort({ date: 1, createdAt: 1 });
+  const [movements, exportsList, settings] = await Promise.all([
+    StockMovement.find(query).sort({ date: 1, createdAt: 1 }),
+    includeUsage ? Export.find({ date: { $gte: startDate, $lte: endDate } }).sort({ date: 1, createdAt: 1 }) : Promise.resolve([]),
+    Settings.getSettings()
+  ]);
 
   const monthNamesEn = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
   const monthNamesTa = ['ஜனவரி', 'பிப்ரவரி', 'மார்ச்', 'ஏப்ரல்', 'மே', 'ஜூன்', 'ஜூலை', 'ஆகஸ்ட்', 'செப்டம்பர்', 'அக்டோபர்', 'நவம்பர்', 'டிசம்பர்'];
 
-  // Resolves the specific variety/type name (e.g. SONA, A1, SUPER, Grade A)
   function resolveStockVariety(m) {
     const raw = (m.variety || m.notes || '').trim();
     if (raw) {
@@ -638,15 +734,12 @@ async function getIncomingStockReport(params = {}) {
     return m.item === 'powder' ? '------' : 'SONA';
   }
 
-  // IMPORTANT DATE RULE: Only include actual stock-entry dates from data. Do NOT generate all calendar days.
   const monthsMap = new Map();
 
-  movements.forEach(m => {
-    const d = new Date(m.date);
+  function getOrCreateMonth(d) {
     const y = d.getFullYear();
     const mIdx = d.getMonth();
     const key = `${y}-${pad(mIdx + 1)}`;
-
     if (!monthsMap.has(key)) {
       monthsMap.set(key, {
         key,
@@ -658,16 +751,27 @@ async function getIncomingStockReport(params = {}) {
         entries: [],
         totalKg: 0,
         tobaccoKg: 0,
-        powderKg: 0
+        powderKg: 0,
+        totalIncomingKg: 0,
+        totalUsageKg: 0,
+        exportBoxes: 0,
+        tobaccoUsageKg: 0,
+        powderUsageKg: 0,
+        netBalanceKg: 0
       });
     }
+    return monthsMap.get(key);
+  }
 
-    const monthObj = monthsMap.get(key);
+  // 1. Process inward stock movements
+  movements.forEach(m => {
+    const d = new Date(m.date);
+    const monthObj = getOrCreateMonth(d);
     const kg = Number((m.quantityGrams / 1000).toFixed(2));
     const kgDisplay = (Number.isInteger(kg) || kg % 1 === 0) ? Math.round(kg) : Number(kg.toFixed(2));
 
     const dayStr = pad(d.getDate());
-    const monStr = pad(mIdx + 1);
+    const monStr = pad(d.getMonth() + 1);
     const yearStr = d.getFullYear();
     const dateFormatted = `${dayStr}-${monStr}-${yearStr}`;
 
@@ -679,12 +783,15 @@ async function getIncomingStockReport(params = {}) {
       date: m.date,
       dateFormatted,
       item: m.item,
+      entryType: 'inward',
       typeLabel,
       kg: kgDisplay,
+      kgSigned: kgDisplay,
       notes: m.notes || ''
     });
 
     monthObj.totalKg = Number((monthObj.totalKg + kg).toFixed(2));
+    monthObj.totalIncomingKg = Number((monthObj.totalIncomingKg + kg).toFixed(2));
     if (isPowder) {
       monthObj.powderKg = Number((monthObj.powderKg + kg).toFixed(2));
     } else {
@@ -692,38 +799,150 @@ async function getIncomingStockReport(params = {}) {
     }
   });
 
-  // Convert map to chronological list; skips empty months automatically
+  // 2. Process export production usage (strictly from Exporting Boxes only, not daily production data)
+  if (includeUsage && exportsList && exportsList.length > 0) {
+    const beedisPerBox = settings.beedisPerBox || 6000;
+    const tobaccoPer1000 = settings.tobaccoPer1000Grams || 600;
+    const powderPer1000 = settings.powderPer1000Grams || 200;
+
+    exportsList.forEach(exp => {
+      const d = new Date(exp.date);
+      const monthObj = getOrCreateMonth(d);
+
+      const dayStr = pad(d.getDate());
+      const monStr = pad(d.getMonth() + 1);
+      const yearStr = d.getFullYear();
+      const dateFormatted = `${dayStr}-${monStr}-${yearStr}`;
+
+      const boxes = (exp.boxes !== undefined && exp.boxes !== null && exp.boxes > 0)
+        ? exp.boxes
+        : ((exp.cuts || 0) / (settings.cutsPerBox || 300));
+      const beedis = exp.beedis || Math.round(boxes * beedisPerBox);
+
+      const tobGrams = (beedis / 1000) * tobaccoPer1000;
+      const tobKgRaw = Number((tobGrams / 1000).toFixed(2));
+      const tobKg = (Number.isInteger(tobKgRaw) || tobKgRaw % 1 === 0) ? Math.round(tobKgRaw) : Number(tobKgRaw.toFixed(2));
+
+      const powGrams = (beedis / 1000) * powderPer1000;
+      const powKgRaw = Number((powGrams / 1000).toFixed(2));
+      const powKg = (Number.isInteger(powKgRaw) || powKgRaw % 1 === 0) ? Math.round(powKgRaw) : Number(powKgRaw.toFixed(2));
+
+      monthObj.exportBoxes = Number((monthObj.exportBoxes + boxes).toFixed(1));
+
+      if (itemFilter === 'all' || itemFilter === 'tobacco' || itemFilter === 'sona' || itemFilter === 'a1' || itemFilter === 'super') {
+        monthObj.entries.push({
+          _id: `exp_tob_${exp._id}`,
+          date: exp.date,
+          dateFormatted,
+          item: 'tobacco',
+          entryType: 'usage',
+          typeLabel: `ஏற்றுமதி பயன்பாடு (${boxes} Boxes)`,
+          typeLabelEn: `Export Usage (${boxes} Boxes)`,
+          kg: tobKg,
+          kgSigned: -tobKg,
+          boxes,
+          notes: exp.companyName ? `Company: ${exp.companyName}` : (exp.notes || '')
+        });
+        monthObj.tobaccoUsageKg = Number((monthObj.tobaccoUsageKg + tobKgRaw).toFixed(2));
+        monthObj.totalUsageKg = Number((monthObj.totalUsageKg + tobKgRaw).toFixed(2));
+      }
+
+      if (itemFilter === 'all' || itemFilter === 'powder') {
+        monthObj.entries.push({
+          _id: `exp_pow_${exp._id}`,
+          date: exp.date,
+          dateFormatted,
+          item: 'powder',
+          entryType: 'usage',
+          typeLabel: `ஏற்றுமதி பயன்பாடு (${boxes} Boxes)`,
+          typeLabelEn: `Export Usage (${boxes} Boxes)`,
+          kg: powKg,
+          kgSigned: -powKg,
+          boxes,
+          notes: exp.companyName ? `Company: ${exp.companyName}` : (exp.notes || '')
+        });
+        monthObj.powderUsageKg = Number((monthObj.powderUsageKg + powKgRaw).toFixed(2));
+        monthObj.totalUsageKg = Number((monthObj.totalUsageKg + powKgRaw).toFixed(2));
+      }
+    });
+  }
+
+  // Convert map to chronological list
   const monthsList = Array.from(monthsMap.values()).sort((a, b) => a.key.localeCompare(b.key));
 
   let grandTotalKg = 0;
   let totalTobaccoKg = 0;
   let totalPowderKg = 0;
+  let grandTotalUsageKg = 0;
+  let grandTotalTobaccoUsageKg = 0;
+  let grandTotalPowderUsageKg = 0;
+  let grandTotalExportBoxes = 0;
   let totalEntriesCount = 0;
 
   monthsList.forEach(m => {
-    const mTotal = (Number.isInteger(m.totalKg) || m.totalKg % 1 === 0) ? Math.round(m.totalKg) : Number(m.totalKg.toFixed(2));
-    m.totalKg = mTotal;
-    m.monthTotalLine = `Total Kg in ${m.englishMonth} (${m.tamilMonth} மாத மொத்த கிலோ) = ${mTotal}Kg`;
+    // Sort entries chronologically by calendar date
+    m.entries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-    grandTotalKg = Number((grandTotalKg + m.totalKg).toFixed(2));
+    const mInwardTotal = (Number.isInteger(m.totalIncomingKg) || m.totalIncomingKg % 1 === 0)
+      ? Math.round(m.totalIncomingKg)
+      : Number(m.totalIncomingKg.toFixed(2));
+    m.totalIncomingKg = mInwardTotal;
+
+    const mUsageTotal = (Number.isInteger(m.totalUsageKg) || m.totalUsageKg % 1 === 0)
+      ? Math.round(m.totalUsageKg)
+      : Number(m.totalUsageKg.toFixed(2));
+    m.totalUsageKg = mUsageTotal;
+
+    const mNet = Number((mInwardTotal - mUsageTotal).toFixed(2));
+    m.netBalanceKg = (Number.isInteger(mNet) || mNet % 1 === 0) ? Math.round(mNet) : mNet;
+
+    if (includeUsage) {
+      m.totalKg = m.netBalanceKg;
+      m.monthTotalLine = `Total in ${m.englishMonth} (${m.tamilMonth}): வரவு = ${mInwardTotal}Kg | பயன்பாடு (${m.exportBoxes} கட்டை) = ${mUsageTotal}Kg | மீதம் = ${m.netBalanceKg}Kg`;
+    } else {
+      m.totalKg = mInwardTotal;
+      m.monthTotalLine = `Total Kg in ${m.englishMonth} (${m.tamilMonth} மாத மொத்த கிலோ) = ${mInwardTotal}Kg`;
+    }
+
+    grandTotalKg = Number((grandTotalKg + mInwardTotal).toFixed(2));
     totalTobaccoKg = Number((totalTobaccoKg + m.tobaccoKg).toFixed(2));
     totalPowderKg = Number((totalPowderKg + m.powderKg).toFixed(2));
+    grandTotalUsageKg = Number((grandTotalUsageKg + mUsageTotal).toFixed(2));
+    grandTotalTobaccoUsageKg = Number((grandTotalTobaccoUsageKg + m.tobaccoUsageKg).toFixed(2));
+    grandTotalPowderUsageKg = Number((grandTotalPowderUsageKg + m.powderUsageKg).toFixed(2));
+    grandTotalExportBoxes = Number((grandTotalExportBoxes + m.exportBoxes).toFixed(1));
     totalEntriesCount += m.entries.length;
   });
 
-  const finalGrandTotal = (Number.isInteger(grandTotalKg) || grandTotalKg % 1 === 0) ? Math.round(grandTotalKg) : Number(grandTotalKg.toFixed(2));
-  const finalTotalLine = `Total Kg (மொத்த கிலோ) = ${finalGrandTotal}Kg`;
+  const finalGrandTotalIncoming = (Number.isInteger(grandTotalKg) || grandTotalKg % 1 === 0) ? Math.round(grandTotalKg) : Number(grandTotalKg.toFixed(2));
+  const finalGrandTotalUsage = (Number.isInteger(grandTotalUsageKg) || grandTotalUsageKg % 1 === 0) ? Math.round(grandTotalUsageKg) : Number(grandTotalUsageKg.toFixed(2));
+  const finalGrandNetBalance = Number((finalGrandTotalIncoming - finalGrandTotalUsage).toFixed(2));
+  const finalGrandNetBalanceDisplay = (Number.isInteger(finalGrandNetBalance) || finalGrandNetBalance % 1 === 0) ? Math.round(finalGrandNetBalance) : finalGrandNetBalance;
+
+  let finalTotalLine;
+  if (includeUsage) {
+    finalTotalLine = `Total (மொத்தம்): வரவு = ${finalGrandTotalIncoming}Kg | பயன்பாடு (${grandTotalExportBoxes} கட்டை) = ${finalGrandTotalUsage}Kg | நிகர இருப்பு = ${finalGrandNetBalanceDisplay}Kg`;
+  } else {
+    finalTotalLine = `Total Kg (மொத்த கிலோ) = ${finalGrandTotalIncoming}Kg`;
+  }
 
   return {
     from: fromFormatted,
     to: toFormatted,
     itemFilter,
+    includeUsage,
     months: monthsList,
-    grandTotalKg: finalGrandTotal,
+    grandTotalKg: includeUsage ? finalGrandNetBalanceDisplay : finalGrandTotalIncoming,
+    grandTotalIncomingKg: finalGrandTotalIncoming,
+    grandTotalUsageKg: finalGrandTotalUsage,
+    grandTotalExportBoxes,
+    grandNetBalanceKg: finalGrandNetBalanceDisplay,
     finalTotalLine,
     totalEntries: totalEntriesCount,
     totalTobaccoKg: (Number.isInteger(totalTobaccoKg) || totalTobaccoKg % 1 === 0) ? Math.round(totalTobaccoKg) : Number(totalTobaccoKg.toFixed(2)),
     totalPowderKg: (Number.isInteger(totalPowderKg) || totalPowderKg % 1 === 0) ? Math.round(totalPowderKg) : Number(totalPowderKg.toFixed(2)),
+    totalTobaccoUsageKg: (Number.isInteger(grandTotalTobaccoUsageKg) || grandTotalTobaccoUsageKg % 1 === 0) ? Math.round(grandTotalTobaccoUsageKg) : Number(grandTotalTobaccoUsageKg.toFixed(2)),
+    totalPowderUsageKg: (Number.isInteger(grandTotalPowderUsageKg) || grandTotalPowderUsageKg % 1 === 0) ? Math.round(grandTotalPowderUsageKg) : Number(grandTotalPowderUsageKg.toFixed(2)),
     generatedAt: new Date().toISOString()
   };
 }
@@ -734,9 +953,11 @@ async function getMonthlyStockReport(monthStr) {
 
 module.exports = {
   getStockSummary,
+  recalculateStockLedger,
   recordStockUsage,
   addStock,
   adjustStock,
+  deductStockWastage,
   deleteStockMovement,
   editStockMovement,
   getRecentMovements,

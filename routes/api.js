@@ -16,8 +16,10 @@ const Export = require('../models/Export');
 const { calculateProductionMetrics, calculateBags, calculateProfit } = require('../services/calculationService');
 const {
   getStockSummary,
+  recalculateStockLedger,
   addStock,
   adjustStock,
+  deductStockWastage,
   deleteStockMovement,
   editStockMovement,
   recordStockUsage,
@@ -264,15 +266,19 @@ router.get(['/dashboard/analytics', '/analytics/dashboard'], async (req, res) =>
     }
 
     function summarize(prods, exps) {
+      const cutsPerBoxVal = settings?.cutsPerBox || 300;
       const cuts = prods.reduce((s, p) => s + (p.cuts || 0), 0);
-      const boxes = prods.reduce((s, p) => s + (p.boxes !== undefined && p.boxes !== null && p.boxes > 0 ? p.boxes : ((p.cuts || 0) / 300)), 0);
+      const boxes = prods.reduce((s, p) => s + (p.boxes !== undefined && p.boxes !== null && p.boxes > 0 ? p.boxes : ((p.cuts || 0) / cutsPerBoxVal)), 0);
       const beedis = prods.reduce((s, p) => s + (p.beedis || 0), 0);
       const tobaccoGrams = prods.reduce((s, p) => s + (p.tobaccoUsedGrams || 0), 0);
       const powderGrams = prods.reduce((s, p) => s + (p.powderUsedGrams || 0), 0);
       const salary = prods.reduce((s, p) => s + (p.salary || 0), 0);
       const rate = prods.reduce((s, p) => s + (p.rate || 0), 0);
       const expensesTotal = exps.reduce((s, e) => s + (e.amount || 0), 0);
-      const profitData = calculateProfit(rate, salary, expensesTotal, beedis, { ratePer1000: settings.ratePer1000 || 340 });
+      const profitData = calculateProfit(rate, salary, expensesTotal, beedis, {
+        ratePer1000: settings?.ratePer1000 || 340,
+        commissionPercent: settings?.commissionPercent ?? 0.10
+      });
       return {
         boxes: Number(boxes.toFixed(1)),
         cuts,
@@ -510,7 +516,8 @@ router.get(['/dashboard/analytics', '/analytics/dashboard'], async (req, res) =>
       weeklyComparison,
       monthlyHistory,
       stock: stockSummary,
-      recentRecords: curProds.slice(-10).reverse()
+      recentRecords: curProds.slice(-10).reverse(),
+      settings
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -829,12 +836,13 @@ router.post('/production', async (req, res) => {
       notes: notes || ''
     });
 
-    // Record consumed stock for reporting (no wastage addition)
+    // Record consumed stock and deduct from inventory
     await recordStockUsage(
       metrics.tobaccoUsedGrams,
       metrics.powderUsedGrams,
       production._id,
-      notes || `Production: ${metrics.boxes} boxes / கட்டை (${metrics.cuts} cuts, ${metrics.beedis} beedis)`
+      notes || `Production: ${metrics.boxes} boxes / கட்டை (${metrics.cuts} cuts, ${metrics.beedis} beedis)`,
+      entryDate
     );
 
     res.status(201).json(production);
@@ -891,25 +899,35 @@ router.put('/production/:id', async (req, res) => {
 
     if (deltaTobacco !== 0) {
       const tobaccoStock = await Stock.getStock('tobacco');
+      tobaccoStock.quantityGrams = Math.max(0, tobaccoStock.quantityGrams - deltaTobacco);
+      tobaccoStock.lastUpdated = new Date();
+      await tobaccoStock.save();
+
       await StockMovement.create({
         item: 'tobacco',
         type: 'adjustment',
         quantityGrams: -deltaTobacco,
         balanceAfterGrams: tobaccoStock.quantityGrams,
         referenceId: id,
-        notes: `Production #${id} updated: ${deltaTobacco > 0 ? 'additional ' + deltaTobacco + 'g consumed' : Math.abs(deltaTobacco) + 'g restored to stock'}`
+        notes: `Production #${id} updated: ${deltaTobacco > 0 ? 'additional ' + deltaTobacco + 'g consumed' : Math.abs(deltaTobacco) + 'g restored to stock'}`,
+        date: bounds.targetDate || new Date()
       });
     }
 
     if (deltaPowder !== 0) {
       const powderStock = await Stock.getStock('powder');
+      powderStock.quantityGrams = Math.max(0, powderStock.quantityGrams - deltaPowder);
+      powderStock.lastUpdated = new Date();
+      await powderStock.save();
+
       await StockMovement.create({
         item: 'powder',
         type: 'adjustment',
         quantityGrams: -deltaPowder,
         balanceAfterGrams: powderStock.quantityGrams,
         referenceId: id,
-        notes: `Production #${id} updated: ${deltaPowder > 0 ? 'additional ' + deltaPowder + 'g consumed' : Math.abs(deltaPowder) + 'g restored to stock'}`
+        notes: `Production #${id} updated: ${deltaPowder > 0 ? 'additional ' + deltaPowder + 'g consumed' : Math.abs(deltaPowder) + 'g restored to stock'}`,
+        date: bounds.targetDate || new Date()
       });
     }
 
@@ -927,6 +945,9 @@ router.put('/production/:id', async (req, res) => {
 
     await production.save();
 
+    // Reconcile stock ledger strictly across all dates
+    await recalculateStockLedger();
+
     res.json(production);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -941,30 +962,45 @@ router.delete('/production/:id', async (req, res) => {
       return res.status(404).json({ error: 'Production record not found' });
     }
 
-    // Record the reversal for audit purposes without changing physical stock.
+    // Restore consumed stock back to inventory on production deletion
     const tobaccoStock = await Stock.getStock('tobacco');
-    const powderStock = await Stock.getStock('powder');
+    const restoreTobacco = production.tobaccoUsedGrams || 0;
+    tobaccoStock.quantityGrams += restoreTobacco;
+    tobaccoStock.lastUpdated = new Date();
+    await tobaccoStock.save();
 
     await StockMovement.create({
       item: 'tobacco',
       type: 'adjustment',
-      quantityGrams: production.tobaccoUsedGrams || 0,
+      quantityGrams: restoreTobacco,
       balanceAfterGrams: tobaccoStock.quantityGrams,
       referenceId: id,
-      notes: `Restored from deleted production #${id}`
+      notes: `Restored from deleted production #${id}`,
+      date: new Date()
     });
+
+    const powderStock = await Stock.getStock('powder');
+    const restorePowder = production.powderUsedGrams || 0;
+    powderStock.quantityGrams += restorePowder;
+    powderStock.lastUpdated = new Date();
+    await powderStock.save();
 
     await StockMovement.create({
       item: 'powder',
       type: 'adjustment',
-      quantityGrams: production.powderUsedGrams,
+      quantityGrams: restorePowder,
       balanceAfterGrams: powderStock.quantityGrams,
       referenceId: id,
-      notes: `Restored from deleted production #${id}`
+      notes: `Restored from deleted production #${id}`,
+      date: new Date()
     });
 
     await Production.findByIdAndDelete(id);
-    res.json({ message: 'Production deleted; stock balance unchanged' });
+
+    // Reconcile stock ledger strictly across all dates
+    await recalculateStockLedger();
+
+    res.json({ message: 'Production deleted and stock restored successfully' });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -979,8 +1015,9 @@ router.get('/stock', async (req, res) => {
     const movements = await getRecentMovements(30);
     const settings = await Settings.getSettings();
 
-    // Bag calculation breakdown
-    const bagCalc = calculateBags(summary.tobacco.kg, settings.avgWastageKg, settings.bagSizeGrams, settings);
+    // Bag calculation breakdown using active bag size (fallback to tobaccoPer1000Grams)
+    const effectiveBagSize = settings.bagSizeGrams || settings.tobaccoPer1000Grams || 550;
+    const bagCalc = calculateBags(summary.tobacco.kg, settings.avgWastageKg, effectiveBagSize, settings);
 
     res.json({
       ...summary,
@@ -995,12 +1032,13 @@ router.get('/stock', async (req, res) => {
 // Stock Report with date filtering and incoming-only materials filter (for TVS minimal PDF generation)
 router.get('/stock/report', async (req, res) => {
   try {
-    const { from, to, month, item, material } = req.query; // YYYY-MM-DD or YYYY-MM
+    const { from, to, month, item, material, includeUsage, includeProductionUsage } = req.query; // YYYY-MM-DD or YYYY-MM
     const report = await getIncomingStockReport({
       from,
       to,
       month,
-      item: item || material || 'all'
+      item: item || material || 'all',
+      includeUsage: includeUsage || includeProductionUsage
     });
     res.json(report);
   } catch (error) {
@@ -1023,15 +1061,30 @@ router.post('/stock/add', async (req, res) => {
   }
 });
 
+router.post('/stock/wastage', async (req, res) => {
+  try {
+    const { item, quantityKg, notes, date } = req.body;
+    const kg = Number(quantityKg);
+    if (!['tobacco', 'powder'].includes(item) || !kg || kg <= 0) {
+      return res.status(400).json({ error: 'Valid item and wastage quantity required' });
+    }
+
+    const result = await deductStockWastage(item, kg, notes ? notes.trim() : '', date || null);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 router.post('/stock/adjust', async (req, res) => {
   try {
-    const { item, newQuantityKg, notes } = req.body;
+    const { item, newQuantityKg, notes, date } = req.body;
     const kg = Number(newQuantityKg);
     if (!['tobacco', 'powder'].includes(item) || kg < 0 || isNaN(kg)) {
       return res.status(400).json({ error: 'Invalid item or quantity' });
     }
 
-    const result = await adjustStock(item, kg, notes);
+    const result = await adjustStock(item, kg, notes, date || null);
     res.json(result);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -1441,6 +1494,11 @@ router.put('/settings', async (req, res) => {
         settings[field] = req.body[field];
       }
     });
+
+    // Auto-sync bag size with tobaccoPer1000 if not explicitly unlinked
+    if (req.body.tobaccoPer1000Grams !== undefined && (req.body.bagSizeGrams === undefined || req.body.bagSizeGrams === null)) {
+      settings.bagSizeGrams = req.body.tobaccoPer1000Grams;
+    }
 
     settings.updatedAt = new Date();
     await settings.save();

@@ -58,7 +58,7 @@
               <span class="metric-label" data-i18n="tobaccoStock">Tobacco கையிருப்பு</span>
               <div class="stock-action-buttons">
                 <button class="btn-secondary" style="min-height: 28px; padding: 2px 8px; font-size: 11px;" onclick="openStockModal('tobacco', 'add')">+ வரவு</button>
-                <button class="btn-secondary" style="min-height: 28px; padding: 2px 8px; font-size: 11px;" onclick="openStockModal('tobacco', 'adjust')">சரிசெய்</button>
+                <button class="btn-secondary btn-action-wastage" style="min-height: 28px; padding: 2px 8px; font-size: 11px; color: var(--accent-red);" onclick="openStockModal('tobacco', 'wastage')">- கழிவு</button>
               </div>
             </div>
             <div class="metric-value" id="stockTobaccoKg">0.0 <span class="metric-unit">kg</span></div>
@@ -71,7 +71,7 @@
               <span class="metric-label" data-i18n="powderStock">தூள் கையிருப்பு</span>
               <div class="stock-action-buttons">
                 <button class="btn-secondary" style="min-height: 28px; padding: 2px 8px; font-size: 11px;" onclick="openStockModal('powder', 'add')">+ வரவு</button>
-                <button class="btn-secondary" style="min-height: 28px; padding: 2px 8px; font-size: 11px;" onclick="openStockModal('powder', 'adjust')">சரிசெய்</button>
+                <button class="btn-secondary btn-action-wastage" style="min-height: 28px; padding: 2px 8px; font-size: 11px; color: var(--accent-red);" onclick="openStockModal('powder', 'wastage')">- கழிவு</button>
               </div>
             </div>
             <div class="metric-value" id="stockPowderKg">0.0 <span class="metric-unit">kg</span></div>
@@ -162,13 +162,19 @@
         <div class="card">
           <div class="card-title-row">
             <h3 class="card-title">🧮 <span data-i18n="bagCalcTitle">பைகள் கணக்கீட்டு கருவி (Bag Calculator)</span></h3>
+            <span class="badge badge-accent" id="bagCalcRatioBadge" style="font-size: 11px; font-weight: 700;">550g / Bag</span>
           </div>
-          <p class="section-subtitle" style="margin-bottom: 14px;" data-i18n="bagCalcSub">
+          <p class="section-subtitle" style="margin-bottom: 14px;" data-i18n="bagCalcSub" id="bagCalcSubtitle">
             மொத்த புகையிலையிலிருந்து கழிவு கழித்து எத்தனை பைகள் பிரிக்கலாம் என்ற உடனடி கணக்கீடு
           </p>
           <div class="bag-calc-grid">
             <div class="form-group">
-              <label class="form-label" for="bagCalcTotalKg" data-i18n="bagCalcTotalLabel">மொத்த எடை (Total Weight in kg)</label>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <label class="form-label" for="bagCalcTotalKg" style="margin-bottom: 0;" data-i18n="bagCalcTotalLabel">மொத்த எடை (Total Weight in kg)</label>
+                <button type="button" id="btnUseCurrentStockTobacco" class="btn-secondary" style="display: none; padding: 2px 8px; font-size: 11px; border-radius: 4px; border: 1px solid var(--border);" onclick="useCurrentTobaccoForBagCalc()">
+                  🍃 <span id="btnUseCurrentStockTobaccoText">நடப்பு இருப்பு</span>
+                </button>
+              </div>
               <input type="number" id="bagCalcTotalKg" class="form-input" value="35" min="1" step="0.5" oninput="runBagCalculator()">
             </div>
             <div class="form-group">
@@ -177,15 +183,15 @@
             </div>
             <div class="form-group">
               <label class="form-label" for="bagCalcBagSize" data-i18n="bagCalcBagSizeLabel">ஒரு பை அளவு (Bag Size in Grams)</label>
-              <input type="number" id="bagCalcBagSize" class="form-input" value="600" min="100" step="50" oninput="runBagCalculator()">
+              <input type="number" id="bagCalcBagSize" class="form-input" value="550" min="100" step="10" oninput="runBagCalculator()">
             </div>
           </div>
           <div class="bag-calc-result">
             <div>
               <div style="font-size: 11px; color: var(--text-dim); text-transform: uppercase; font-weight: 600;" data-i18n="bagCalcResultTitle">பிரிக்கக்கூடிய பைகள்</div>
-              <div class="metric-value" style="font-size: 20px; color: var(--accent-green);" id="bagCalcResultBags">55 <span class="metric-unit">Bags</span></div>
+              <div class="metric-value" style="font-size: 20px; color: var(--accent-green);" id="bagCalcResultBags">60 <span class="metric-unit">Bags</span></div>
             </div>
-            <div id="bagCalcResultUsable" style="font-size: 13px; color: var(--text-muted); font-weight: 500;">33 kg Usable (33,000g ÷ 600g)</div>
+            <div id="bagCalcResultUsable" style="font-size: 13px; color: var(--text-muted); font-weight: 500;">33 kg Usable (33,000g ÷ 550g)</div>
           </div>
         </div>
 
@@ -229,6 +235,15 @@
                 <button type="button" class="btn-preset" id="btnPreset3Months" onclick="setStockReportPreset('3-months')" data-i18n="presetLast3Months">கடந்த 3 மாதங்கள்</button>
                 <button type="button" class="btn-preset" id="btnPresetThisYear" onclick="setStockReportPreset('this-year')" data-i18n="presetThisYear">இந்த வருடம்</button>
               </div>
+              <div class="stock-report-toggle-wrap">
+                <label class="toggle-switch-label" for="stockReportIncludeUsageToggle" title="உற்பத்தி பயன்பாட்டை சேர்க்க (Export Boxes Usage)">
+                  <span class="toggle-switch">
+                    <input type="checkbox" id="stockReportIncludeUsageToggle" onchange="onStockReportUsageToggleChange()">
+                    <span class="toggle-slider"></span>
+                  </span>
+                  <span class="toggle-text" data-i18n="toggleIncludeUsage">உற்பத்தி பயன்பாட்டை சேர்க்க (Export Boxes)</span>
+                </label>
+              </div>
             </div>
             <div class="stock-report-btn-group">
               <button type="button" class="btn-primary" id="btnDownloadStockImage" onclick="downloadStockImage()">
@@ -267,6 +282,18 @@
             <div class="snapshot-metric">
               <span class="snapshot-label" data-i18n="snapTotalIncomingLabel">மொத்த வரவு (Total Incoming):</span>
               <strong id="snapTotalIncoming" style="color: var(--accent-gold); font-size: 16px;">0 kg</strong>
+            </div>
+            <div class="snapshot-metric" id="snapExportBoxesWrap" style="display: none;">
+              <span class="snapshot-label" data-i18n="snapExportBoxesLabel">ஏற்றுமதி கட்டை (Export Boxes):</span>
+              <strong id="snapExportBoxes" style="color: var(--accent-blue, #38bdf8);">0 Boxes</strong>
+            </div>
+            <div class="snapshot-metric" id="snapUsageWrap" style="display: none;">
+              <span class="snapshot-label" data-i18n="snapUsageLabel">பயன்பாடு (Export Usage):</span>
+              <strong id="snapUsage" style="color: var(--accent-red, #f87171);">-0 kg</strong>
+            </div>
+            <div class="snapshot-metric" id="snapNetBalanceWrap" style="display: none;">
+              <span class="snapshot-label" data-i18n="snapNetBalanceLabel">நிகர இருப்பு (Net Balance):</span>
+              <strong id="snapNetBalance" style="color: var(--accent-green, #4ade80); font-size: 16px;">0 kg</strong>
             </div>
           </div>
         </div>
@@ -442,8 +469,8 @@
   <script src="/js/html2canvas.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="/js/html2pdf.bundle.min.js"></script>
-  <script src="/js/i18n.js"></script>
-  <script src="/js/common.js"></script>
-  <script src="/js/stock.js"></script>
+  <script src="/js/i18n.js?v=20260922-2"></script>
+  <script src="/js/common.js?v=20260922-2"></script>
+  <script src="/js/stock.js?v=20260922-2"></script>
 </body>
 </html>

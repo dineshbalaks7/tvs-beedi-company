@@ -38,13 +38,53 @@ async function loadSettingsData() {
     if (setAvgWastageEl) setAvgWastageEl.value = data.avgWastageKg ?? 2;
 
     const setBagSizeEl = document.getElementById('setBagSize');
-    if (setBagSizeEl) setBagSizeEl.value = data.bagSizeGrams || 600;
+    if (setBagSizeEl) setBagSizeEl.value = data.bagSizeGrams || data.tobaccoPer1000Grams || 550;
 
     const setLowStockEl = document.getElementById('setLowStock');
     if (setLowStockEl) setLowStockEl.value = data.lowStockThresholdKg || 5;
+
+    if (setTobaccoPer1000El && !setTobaccoPer1000El._bagSyncAttached) {
+      setTobaccoPer1000El._bagSyncAttached = true;
+      setTobaccoPer1000El.addEventListener('input', () => {
+        if (setBagSizeEl) setBagSizeEl.value = setTobaccoPer1000El.value;
+        updateSettingsNotes();
+      });
+    }
+
+    updateSettingsNotes();
   } catch (err) {
     console.error('Error loading settings:', err);
     showToast('Failed to load settings', 'error');
+  }
+}
+
+function updateSettingsNotes() {
+  const beedisPerBox = Number(document.getElementById('setBeedisPerBox')?.value) || 6000;
+  const cutsPerBox = Number(document.getElementById('setCutsPerBox')?.value) || 300;
+  const beedisPerCut = Number(document.getElementById('setBeedisPerCut')?.value) || 20;
+  const salaryPer1000 = Number(document.getElementById('setSalaryPer1000')?.value) || 320;
+  const ratePer1000 = Number(document.getElementById('setRatePer1000')?.value) || 340;
+  const tobaccoPer1000 = Number(document.getElementById('setTobaccoPer1000')?.value) || 550;
+  const bagSize = Number(document.getElementById('setBagSize')?.value) || tobaccoPer1000;
+
+  const boxSalary = (beedisPerBox / 1000) * salaryPer1000;
+  const boxRate = (beedisPerBox / 1000) * ratePer1000;
+
+  const noteBoxCuts = document.getElementById('noteBoxCuts');
+  if (noteBoxCuts) noteBoxCuts.textContent = `${cutsPerBox} கட்டுகள் × ${beedisPerCut} = ${formatNumber(beedisPerBox)} பீடிகள்`;
+
+  const noteBoxSalary = document.getElementById('noteBoxSalary');
+  if (noteBoxSalary) noteBoxSalary.textContent = `1 Box கூலி: ${formatINR(boxSalary)}`;
+
+  const noteBoxRate = document.getElementById('noteBoxRate');
+  if (noteBoxRate) noteBoxRate.textContent = `1 Box மதிப்பு: ${formatINR(boxRate)}`;
+
+  const noteBagSize = document.getElementById('noteBagSize');
+  if (noteBagSize) {
+    const isEn = typeof currentLanguage !== 'undefined' && currentLanguage === 'en';
+    noteBagSize.textContent = isEn
+      ? `1 Bag = ${bagSize}g (Used in Tobacco Bag Calculation Tool)`
+      : `1 Bag = ${bagSize}g (Tobacco Bag Tool-ல் பயன்படுத்தப்படும்)`;
   }
 }
 
@@ -85,12 +125,18 @@ async function handleSettingsSubmit(event) {
 
     if (!res.ok) throw new Error('Failed to update settings');
     const updated = await res.json();
-    window.appSettings = updated;
+    window.appSettings = { ...window.appSettings, ...updated };
+    try {
+      localStorage.setItem('tvs_app_settings', JSON.stringify(window.appSettings));
+    } catch (e) {}
+    window.dispatchEvent(new CustomEvent('settingsLoaded', { detail: window.appSettings }));
+    updateSettingsNotes();
     showToast('Settings saved successfully', 'success');
   } catch (err) {
     showToast(err.message, 'error');
   }
 }
+
 
 async function handleChangePassword(event) {
   event.preventDefault();

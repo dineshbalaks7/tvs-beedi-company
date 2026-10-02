@@ -260,7 +260,16 @@ app.use((req, res, next) => {
   return next();
 });
 
-app.use(express.static(path.join(__dirname, 'public'), { index: false }));
+app.use(express.static(path.join(__dirname, 'public'), {
+  index: false,
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.js') || filePath.endsWith('.css') || filePath.endsWith('.html')) {
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+    }
+  }
+}));
 
 // API Routes
 app.use('/api', requireAuth, apiRoutes);
@@ -310,12 +319,15 @@ async function initializeDatabase() {
         lowStockThresholdKg: 5
       });
       console.log('✅ Default settings created (Tamil first, 1 Box = 300 cuts = 6,000 beedis, 20 beedis/cut, 600g tobacco, 200g powder, ₹320 salary, ₹340 rate).');
-    } else if (settings.beedisPerBox !== 6000 || settings.cutsPerBox !== 300 || settings.beedisPerCut !== 20) {
-      settings.beedisPerBox = 6000;
-      settings.cutsPerBox = 300;
-      settings.beedisPerCut = 20;
-      await settings.save();
-      console.log('✅ Migrated settings to Boxes (1 Box = 300 cuts = 6,000 beedis, 20 beedis/cut).');
+    } else {
+      let needsSave = false;
+      if (!settings.beedisPerBox) { settings.beedisPerBox = 6000; needsSave = true; }
+      if (!settings.cutsPerBox) { settings.cutsPerBox = 300; needsSave = true; }
+      if (!settings.beedisPerCut) { settings.beedisPerCut = 20; needsSave = true; }
+      if (needsSave) {
+        await settings.save();
+        console.log('✅ Settings initialized with missing Box defaults.');
+      }
     }
 
     // 2. Ensure stock documents exist without inventing physical stock.
