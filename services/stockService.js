@@ -282,7 +282,7 @@ async function editStockMovement(movementId, { quantityKg, notes, date }) {
   return { success: true, movement: refreshedMovement || movement, stock };
 }
 
-async function getRecentMovements(limit = 50) {
+async function getRecentMovements(limit = null) {
   const movements = await StockMovement.find().populate('referenceId');
 
   const typePriority = (m) => {
@@ -309,7 +309,10 @@ async function getRecentMovements(limit = 50) {
     return timeB - timeA;
   });
 
-  return movements.slice(0, limit);
+  if (limit && Number.isFinite(limit) && limit > 0) {
+    return movements.slice(0, limit);
+  }
+  return movements;
 }
 
 async function getStockReport(params = {}) {

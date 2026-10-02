@@ -1012,7 +1012,7 @@ router.delete('/production/:id', async (req, res) => {
 router.get('/stock', async (req, res) => {
   try {
     const summary = await getStockSummary();
-    const movements = await getRecentMovements(30);
+    const movements = await getRecentMovements();
     const settings = await Settings.getSettings();
 
     // Bag calculation breakdown using active bag size (fallback to tobaccoPer1000Grams)
@@ -1023,6 +1023,44 @@ router.get('/stock', async (req, res) => {
       ...summary,
       bagCalculation: bagCalc,
       movements
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Stock Movements Ledger with item filter, date filter, and pagination (10 per page default)
+router.get('/stock/movements', async (req, res) => {
+  try {
+    const { item, from, to, page, limit } = req.query;
+    let movements = await getRecentMovements();
+
+    if (item && item !== 'all') {
+      movements = movements.filter(m => m.item === item);
+    }
+
+    if (from || to) {
+      movements = movements.filter(m => {
+        const d = (m.date ? new Date(m.date) : new Date(m.createdAt)).toISOString().split('T')[0];
+        if (from && d < from) return false;
+        if (to && d > to) return false;
+        return true;
+      });
+    }
+
+    const pageSize = Math.max(1, parseInt(limit, 10) || 10);
+    const currentPage = Math.max(1, parseInt(page, 10) || 1);
+    const totalRecords = movements.length;
+    const totalPages = Math.max(1, Math.ceil(totalRecords / pageSize));
+    const startIndex = (currentPage - 1) * pageSize;
+    const paginatedRecords = movements.slice(startIndex, startIndex + pageSize);
+
+    res.json({
+      total: totalRecords,
+      totalPages,
+      currentPage,
+      pageSize,
+      movements: paginatedRecords
     });
   } catch (error) {
     res.status(500).json({ error: error.message });

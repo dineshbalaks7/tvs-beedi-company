@@ -299,10 +299,54 @@
         </div>
 
         <!-- Stock Movements Ledger Card -->
-        <div class="card">
+        <div class="card" id="stockMovementsLedgerCard">
           <div class="card-title-row">
-            <h3 class="card-title">📜 <span data-i18n="movementsTitle">சரக்கு இயக்க வரலாறு (Stock Movements Ledger)</span></h3>
+            <div>
+              <h3 class="card-title">📜 <span data-i18n="movementsTitle">சரக்கு இயக்க வரலாறு (Stock Movements Ledger)</span></h3>
+              <p class="section-subtitle" style="margin-top: 4px; margin-bottom: 0;" data-i18n="movementsSubtitle">
+                புகையிலை மற்றும் தூள் பரிவர்த்தனைகள், உற்பத்தி பயன்பாடு மற்றும் இருப்பு மாற்றங்கள்
+              </p>
+            </div>
+            <span class="badge badge-amber" id="ledgerActiveCountBadge">0 Records</span>
           </div>
+
+          <!-- Stock Movements Ledger Toolbar & Filters -->
+          <div class="stock-ledger-toolbar">
+            <div class="stock-ledger-filters">
+              <div class="stock-filter-item">
+                <label for="stockLedgerMaterialFilter" class="stock-filter-label" data-i18n="filterMaterialLabel">பொருள் (Material):</label>
+                <select id="stockLedgerMaterialFilter" class="form-input stock-material-select" onchange="onStockLedgerFilterChange()">
+                  <option value="all" data-i18n="ledgerFilterAll">அனைத்தும் (All - Leaf & Powder)</option>
+                  <option value="tobacco" data-i18n="ledgerFilterTobacco">புகையிலை (Tobacco / Leaf)</option>
+                  <option value="powder" data-i18n="ledgerFilterPowder">தூள் (Tobacco Powder)</option>
+                </select>
+              </div>
+
+              <div class="stock-filter-item">
+                <label for="stockLedgerFromDate" class="stock-filter-label" data-i18n="reportFilterFromLabel">முதல் (From):</label>
+                <input type="date" id="stockLedgerFromDate" class="form-input stock-date-input" onchange="onStockLedgerFilterChange()">
+              </div>
+
+              <div class="stock-filter-item">
+                <label for="stockLedgerToDate" class="stock-filter-label" data-i18n="reportFilterToLabel">வரை (To):</label>
+                <input type="date" id="stockLedgerToDate" class="form-input stock-date-input" onchange="onStockLedgerFilterChange()">
+              </div>
+
+              <div class="stock-ledger-presets">
+                <button type="button" class="btn-preset active" id="btnLedgerPresetAll" onclick="setStockLedgerDatePreset('all')" data-i18n="ledgerPresetAll">அனைத்தும்</button>
+                <button type="button" class="btn-preset" id="btnLedgerPresetToday" onclick="setStockLedgerDatePreset('today')" data-i18n="ledgerPresetToday">இன்று</button>
+                <button type="button" class="btn-preset" id="btnLedgerPresetThisMonth" onclick="setStockLedgerDatePreset('this-month')" data-i18n="ledgerPresetThisMonth">இந்த மாதம்</button>
+                <button type="button" class="btn-preset" id="btnLedgerPresetLastMonth" onclick="setStockLedgerDatePreset('last-month')" data-i18n="ledgerPresetLastMonth">கடந்த மாதம்</button>
+              </div>
+
+              <div class="stock-ledger-actions">
+                <button type="button" class="btn-secondary btn-sm" id="btnResetStockLedgerFilter" onclick="resetStockLedgerFilters()" title="Reset Filters">
+                  <span>🔄</span> <span data-i18n="ledgerClearFilters">மீட்டமை</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
           <div class="table-responsive">
             <table class="data-table">
               <thead>
@@ -320,6 +364,22 @@
                 <tr><td colspan="7" style="text-align:center;" data-i18n="loading">ஏற்றப்படுகிறது...</td></tr>
               </tbody>
             </table>
+          </div>
+
+          <!-- Pagination Bar (10 records per page) -->
+          <div class="ledger-pagination-bar" id="stockLedgerPagination">
+            <div class="pagination-info" id="stockLedgerPaginationInfo">
+              <!-- e.g. Showing 1-10 of 43 records -->
+            </div>
+            <div class="pagination-controls">
+              <button type="button" class="btn-page-nav" id="btnLedgerPrevPage" onclick="changeStockLedgerPage(-1)" disabled>
+                ◀ <span data-i18n="ledgerPrev">முந்தைய</span>
+              </button>
+              <div class="pagination-numbers" id="stockLedgerPageNumbers"></div>
+              <button type="button" class="btn-page-nav" id="btnLedgerNextPage" onclick="changeStockLedgerPage(1)">
+                <span data-i18n="ledgerNext">அடுத்த</span> ▶
+              </button>
+            </div>
           </div>
         </div>
       </section>

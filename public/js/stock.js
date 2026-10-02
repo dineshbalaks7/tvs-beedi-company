@@ -5,6 +5,29 @@
 
 let cachedStock = null;
 
+// Stock Movement Ledger State (Filters & 10 records/page pagination)
+const stockLedgerState = {
+  item: 'all',
+  fromDate: '',
+  toDate: '',
+  page: 1,
+  pageSize: 10
+};
+
+function getMovementISODate(dateVal) {
+  if (!dateVal) return '';
+  if (typeof dateVal === 'string') {
+    const match = dateVal.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (match) return `${match[1]}-${match[2]}-${match[3]}`;
+  }
+  const d = new Date(dateVal);
+  if (isNaN(d.getTime())) return '';
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 async function loadStockData() {
   try {
     const res = await fetch('/api/stock');
@@ -89,52 +112,7 @@ function renderStockUI(data) {
   }
 
   // Movements ledger table
-  const tbody = document.getElementById('stockMovementsTableBody');
-  if (tbody && data.movements) {
-    if (data.movements.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color: var(--text-dim);">${isEn ? 'No movements recorded' : 'சரக்கு இயக்க பதிவுகள் இல்லை'}</td></tr>`;
-    } else {
-      const typeMapTa = {
-        initial: 'ஆரம்ப இருப்பு',
-        added: 'சரக்கு வரவு',
-        production_usage: 'உற்பத்தி பயன்பாடு',
-        adjustment: 'இருப்பு சரிசெய்தல்',
-        wastage: 'சேதம் / கழிவு'
-      };
-      const typeMapEn = {
-        initial: 'Initial Stock',
-        added: 'Stock Added',
-        production_usage: 'Production Usage',
-        adjustment: 'Adjustment',
-        wastage: 'Wastage'
-      };
-      const typeMap = isEn ? typeMapEn : typeMapTa;
-
-      tbody.innerHTML = data.movements.map(m => {
-        const isAdd = m.quantityGrams > 0;
-        const qtyText = isAdd ? `+${(m.quantityGrams / 1000).toFixed(2)} kg` : `${(m.quantityGrams / 1000).toFixed(2)} kg`;
-        const qtyColor = isAdd ? 'var(--accent-green)' : 'var(--accent-red)';
-        const itemDisplay = (m.item === 'tobacco') ? 'Tobacco' : (isEn ? 'Powder' : 'தூள்');
-        const movementType = typeMap[m.type] || m.type;
-        return `
-          <tr>
-            <td>${formatDate(m.date)}</td>
-            <td><strong>${itemDisplay}</strong></td>
-            <td><span style="font-size: 11px; padding: 2px 6px; border-radius: 4px; background: rgba(0,0,0,0.06);">${movementType}</span></td>
-            <td style="color: ${qtyColor}; font-weight: 700;">${qtyText}</td>
-            <td>${(m.balanceAfterGrams / 1000).toFixed(2)} kg</td>
-            <td style="color: var(--text-muted); font-size: 12px;">${m.notes || '-'}</td>
-            <td>
-              <div style="display: flex; gap: 6px; align-items: center;">
-                <button class="btn-action-edit" onclick="openEditStockMovementModal('${m._id}')" title="Edit">✏️</button>
-                <button class="btn-danger btn-table-action" onclick="deleteStockMovementAction('${m._id}')" title="Delete">✕</button>
-              </div>
-            </td>
-          </tr>
-        `;
-      }).join('');
-    }
-  }
+  renderStockLedgerTable();
 
   // Quick fill button for bag calculator with current in-hand tobacco
   const btnCurrentStock = document.getElementById('btnUseCurrentStockTobacco');
@@ -143,6 +121,274 @@ function renderStockUI(data) {
     btnCurrentStock.style.display = 'inline-flex';
     if (btnCurrentStockText) {
       btnCurrentStockText.textContent = isEn ? `Use Stock (${data.tobacco.kg} kg)` : `நடப்பு இருப்பு (${data.tobacco.kg} kg)`;
+    }
+  }
+}
+
+// ===================================================================
+// Stock Movements Ledger Filtering (Item & Date) & 10-Item Pagination
+// ===================================================================
+
+function onStockLedgerFilterChange() {
+  const itemSelect = document.getElementById('stockLedgerMaterialFilter');
+  const fromInput = document.getElementById('stockLedgerFromDate');
+  const toInput = document.getElementById('stockLedgerToDate');
+
+  stockLedgerState.item = itemSelect ? itemSelect.value : 'all';
+  stockLedgerState.fromDate = fromInput ? fromInput.value : '';
+  stockLedgerState.toDate = toInput ? toInput.value : '';
+  stockLedgerState.page = 1;
+
+  // Clear active preset buttons when user manually picks a date or material
+  document.querySelectorAll('.stock-ledger-presets .btn-preset').forEach(btn => {
+    btn.classList.remove('active');
+  });
+
+  renderStockLedgerTable();
+}
+
+function setStockLedgerDatePreset(preset) {
+  const now = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  let from = '';
+  let to = '';
+
+  if (preset === 'today') {
+    const todayStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+    from = todayStr;
+    to = todayStr;
+  } else if (preset === 'this-month') {
+    const y = now.getFullYear();
+    const m = now.getMonth();
+    const lastDay = new Date(y, m + 1, 0).getDate();
+    from = `${y}-${pad(m + 1)}-01`;
+    to = `${y}-${pad(m + 1)}-${pad(lastDay)}`;
+  } else if (preset === 'last-month') {
+    const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const y = lastMonthDate.getFullYear();
+    const m = lastMonthDate.getMonth();
+    const lastDay = new Date(y, m + 1, 0).getDate();
+    from = `${y}-${pad(m + 1)}-01`;
+    to = `${y}-${pad(m + 1)}-${pad(lastDay)}`;
+  } else {
+    // 'all'
+    from = '';
+    to = '';
+  }
+
+  const fromInput = document.getElementById('stockLedgerFromDate');
+  const toInput = document.getElementById('stockLedgerToDate');
+  if (fromInput) fromInput.value = from;
+  if (toInput) toInput.value = to;
+
+  stockLedgerState.fromDate = from;
+  stockLedgerState.toDate = to;
+  stockLedgerState.page = 1;
+
+  // Highlight active preset button
+  const presetMap = {
+    'all': 'btnLedgerPresetAll',
+    'today': 'btnLedgerPresetToday',
+    'this-month': 'btnLedgerPresetThisMonth',
+    'last-month': 'btnLedgerPresetLastMonth'
+  };
+  document.querySelectorAll('.stock-ledger-presets .btn-preset').forEach(btn => {
+    btn.classList.remove('active');
+  });
+  const targetBtn = document.getElementById(presetMap[preset]);
+  if (targetBtn) targetBtn.classList.add('active');
+
+  renderStockLedgerTable();
+}
+
+function resetStockLedgerFilters() {
+  const itemSelect = document.getElementById('stockLedgerMaterialFilter');
+  const fromInput = document.getElementById('stockLedgerFromDate');
+  const toInput = document.getElementById('stockLedgerToDate');
+
+  if (itemSelect) itemSelect.value = 'all';
+  if (fromInput) fromInput.value = '';
+  if (toInput) toInput.value = '';
+
+  stockLedgerState.item = 'all';
+  stockLedgerState.fromDate = '';
+  stockLedgerState.toDate = '';
+  stockLedgerState.page = 1;
+
+  document.querySelectorAll('.stock-ledger-presets .btn-preset').forEach(btn => {
+    btn.classList.remove('active');
+  });
+  const btnAll = document.getElementById('btnLedgerPresetAll');
+  if (btnAll) btnAll.classList.add('active');
+
+  renderStockLedgerTable();
+}
+
+function changeStockLedgerPage(delta) {
+  goToStockLedgerPage(stockLedgerState.page + delta);
+}
+
+function goToStockLedgerPage(targetPage) {
+  stockLedgerState.page = targetPage;
+  renderStockLedgerTable();
+  const card = document.getElementById('stockMovementsLedgerCard');
+  if (card) {
+    const rect = card.getBoundingClientRect();
+    if (rect.top < 0) {
+      card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }
+}
+
+function renderStockLedgerTable() {
+  const tbody = document.getElementById('stockMovementsTableBody');
+  if (!tbody) return;
+
+  const isEn = (typeof currentLanguage !== 'undefined' && currentLanguage === 'en');
+  const movements = cachedStock?.movements || [];
+
+  // Filter by Material & Date
+  const filtered = movements.filter(m => {
+    if (stockLedgerState.item !== 'all' && m.item !== stockLedgerState.item) {
+      return false;
+    }
+    const isoDate = getMovementISODate(m.date || m.createdAt);
+    if (stockLedgerState.fromDate && isoDate < stockLedgerState.fromDate) {
+      return false;
+    }
+    if (stockLedgerState.toDate && isoDate > stockLedgerState.toDate) {
+      return false;
+    }
+    return true;
+  });
+
+  const totalRecords = filtered.length;
+  const pageSize = stockLedgerState.pageSize || 10;
+  const totalPages = Math.max(1, Math.ceil(totalRecords / pageSize));
+
+  if (stockLedgerState.page > totalPages) stockLedgerState.page = totalPages;
+  if (stockLedgerState.page < 1) stockLedgerState.page = 1;
+
+  const startIndex = (stockLedgerState.page - 1) * pageSize;
+  const endIndex = Math.min(startIndex + pageSize, totalRecords);
+  const pageRecords = filtered.slice(startIndex, endIndex);
+
+  // Update badge on card
+  const badgeEl = document.getElementById('ledgerActiveCountBadge');
+  if (badgeEl) {
+    badgeEl.textContent = isEn ? `${totalRecords} Records` : `${totalRecords} பதிவுகள்`;
+  }
+
+  // Type translations
+  const typeMapTa = {
+    initial: 'ஆரம்ப இருப்பு',
+    added: 'சரக்கு வரவு',
+    production_usage: 'உற்பத்தி பயன்பாடு',
+    adjustment: 'இருப்பு சரிசெய்தல்',
+    wastage: 'சேதம் / கழிவு'
+  };
+  const typeMapEn = {
+    initial: 'Initial Stock',
+    added: 'Stock Added',
+    production_usage: 'Production Usage',
+    adjustment: 'Adjustment',
+    wastage: 'Wastage'
+  };
+  const typeMap = isEn ? typeMapEn : typeMapTa;
+
+  if (totalRecords === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="7" style="text-align:center; padding: 32px 16px; color: var(--text-dim);">
+          <div style="font-size: 26px; margin-bottom: 8px;">🔍</div>
+          <div style="font-size: 14px; font-weight: 500;">
+            ${isEn ? 'No stock movement records found matching the filter criteria' : 'தேர்ந்தெடுக்கப்பட்ட வடிகட்டலில் சரக்கு இயக்க பதிவுகள் எதுவும் இல்லை'}
+          </div>
+          <button type="button" class="btn-secondary btn-sm" onclick="resetStockLedgerFilters()" style="margin-top: 12px; display: inline-flex; align-items: center; gap: 4px; padding: 6px 12px;">
+            <span>🔄</span> <span>${isEn ? 'Reset Filters' : 'வடிகட்டலை மீட்டமை'}</span>
+          </button>
+        </td>
+      </tr>
+    `;
+  } else {
+    tbody.innerHTML = pageRecords.map(m => {
+      const isAdd = m.quantityGrams > 0;
+      const qtyText = isAdd ? `+${(m.quantityGrams / 1000).toFixed(2)} kg` : `${(m.quantityGrams / 1000).toFixed(2)} kg`;
+      const qtyColor = isAdd ? 'var(--accent-green)' : 'var(--accent-red)';
+      const itemDisplay = (m.item === 'tobacco')
+        ? (isEn ? 'Tobacco' : 'புகையிலை')
+        : (isEn ? 'Powder' : 'தூள்');
+      const itemBadgeClass = (m.item === 'tobacco') ? 'item-badge-tobacco' : 'item-badge-powder';
+      const movementType = typeMap[m.type] || m.type;
+      return `
+        <tr>
+          <td>${formatDate(m.date)}</td>
+          <td><span class="${itemBadgeClass}"><strong>${itemDisplay}</strong></span></td>
+          <td><span class="movement-type-badge">${movementType}</span></td>
+          <td style="color: ${qtyColor}; font-weight: 700;">${qtyText}</td>
+          <td>${(m.balanceAfterGrams / 1000).toFixed(2)} kg</td>
+          <td style="color: var(--text-muted); font-size: 12px;">${m.notes || '-'}</td>
+          <td>
+            <div style="display: flex; gap: 6px; align-items: center;">
+              <button class="btn-action-edit" onclick="openEditStockMovementModal('${m._id}')" title="${isEn ? 'Edit' : 'திருத்து'}">✏️</button>
+              <button class="btn-danger btn-table-action" onclick="deleteStockMovementAction('${m._id}')" title="${isEn ? 'Delete' : 'நீக்கு'}">✕</button>
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  // Render pagination bar
+  const infoEl = document.getElementById('stockLedgerPaginationInfo');
+  if (infoEl) {
+    if (totalRecords === 0) {
+      infoEl.textContent = isEn ? 'Showing 0 records' : 'காட்டுவது 0 பதிவுகள்';
+    } else {
+      infoEl.textContent = isEn
+        ? `Showing ${startIndex + 1}-${endIndex} of ${totalRecords} records (Page ${stockLedgerState.page} of ${totalPages})`
+        : `காட்டுவது ${startIndex + 1}-${endIndex} / மொத்தம் ${totalRecords} பதிவுகள் (பக்கம் ${stockLedgerState.page} / ${totalPages})`;
+    }
+  }
+
+  const prevBtn = document.getElementById('btnLedgerPrevPage');
+  const nextBtn = document.getElementById('btnLedgerNextPage');
+  if (prevBtn) {
+    prevBtn.disabled = (stockLedgerState.page <= 1);
+  }
+  if (nextBtn) {
+    nextBtn.disabled = (stockLedgerState.page >= totalPages || totalRecords === 0);
+  }
+
+  const numbersEl = document.getElementById('stockLedgerPageNumbers');
+  if (numbersEl) {
+    if (totalPages <= 1) {
+      numbersEl.innerHTML = '';
+    } else {
+      let pageHtml = '';
+      const cur = stockLedgerState.page;
+
+      if (totalPages <= 7) {
+        for (let p = 1; p <= totalPages; p++) {
+          pageHtml += `<button type="button" class="btn-page-number ${p === cur ? 'active' : ''}" onclick="goToStockLedgerPage(${p})">${p}</button>`;
+        }
+      } else {
+        // Windowed display: 1 ... cur-1 cur cur+1 ... totalPages
+        pageHtml += `<button type="button" class="btn-page-number ${1 === cur ? 'active' : ''}" onclick="goToStockLedgerPage(1)">1</button>`;
+        if (cur > 3) {
+          pageHtml += `<span class="pagination-ellipsis">...</span>`;
+        }
+        const startPage = Math.max(2, cur - 1);
+        const endPage = Math.min(totalPages - 1, cur + 1);
+        for (let p = startPage; p <= endPage; p++) {
+          pageHtml += `<button type="button" class="btn-page-number ${p === cur ? 'active' : ''}" onclick="goToStockLedgerPage(${p})">${p}</button>`;
+        }
+        if (cur < totalPages - 2) {
+          pageHtml += `<span class="pagination-ellipsis">...</span>`;
+        }
+        pageHtml += `<button type="button" class="btn-page-number ${totalPages === cur ? 'active' : ''}" onclick="goToStockLedgerPage(${totalPages})">${totalPages}</button>`;
+      }
+      numbersEl.innerHTML = pageHtml;
     }
   }
 }
