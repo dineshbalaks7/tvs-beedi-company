@@ -15,8 +15,7 @@
   
   <!-- Stylesheets -->
   <link rel="stylesheet" href="/css/common.css">
-  <link rel="stylesheet" href="/css/production.css">
-  <link rel="stylesheet" href="/css/export.css">
+  <link rel="stylesheet" href="/css/export.css?v=20261024-4">
 </head>
 <body>
   <div class="app-container">
@@ -33,7 +32,7 @@
         </div>
       </div>
       <div class="header-actions">
-        <button id="themeToggleBtn" class="lang-btn" onclick="toggleTheme()" title="Theme">🌙 இரவு</button>
+        <button id="themeToggleBtn" class="lang-btn" onclick="toggleTheme()" title="Theme"><svg class="export-action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 15.5A8 8 0 0 1 8.5 4 8 8 0 1 0 20 15.5Z"/></svg><span>இரவு</span></button>
         <div id="langSwitcher" class="lang-switcher-pill" onclick="toggleLanguage()" role="button" aria-label="Switch Language" title="Switch Language / மொழியை மாற்ற">
           <span id="langChipTa" class="lang-segment active">தமிழ்</span>
           <span id="langChipEn" class="lang-segment">EN</span>
@@ -48,7 +47,7 @@
     <main class="main-content">
       <section id="view-export" class="tab-view active">
         <div class="section-title-wrap">
-          <h2 class="section-title">🚚 <span data-i18n="exportMainTitle">கம்பெனி ஏற்றுமதி (Export & Dispatch)</span></h2>
+          <h2 class="section-title"><svg class="export-inline-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h11v11H3zM14 10h4l3 3v4h-7z"/><circle cx="7" cy="19" r="2"/><circle cx="18" cy="19" r="2"/></svg><span data-i18n="exportMainTitle">கம்பெனி ஏற்றுமதி (Export & Dispatch)</span></h2>
           <p class="section-subtitle" data-i18n="exportSub">தயாரான கட்டைகள் கம்பெனிக்கு ஏற்றுமதி செய்யப்பட்ட விவரங்கள்</p>
         </div>
         <div class="export-summary-filter-row">
@@ -97,7 +96,7 @@
           </div>
           <div class="metric-card">
             <span class="metric-label" data-i18n="packedStockInHand">கையிருப்பிலுள்ள கட்டைகள்</span>
-            <div class="metric-value" id="expPackedStock">0 <span class="metric-unit">Boxes</span></div>
+            <div class="metric-value" id="expPackedStock" style="display:none">0 <span class="metric-unit">Boxes</span></div>
             <div class="metric-sub" id="expStockSub">உற்பத்தி − ஏற்றுமதி = மீதம்</div>
           </div>
         </div>
@@ -105,9 +104,9 @@
         <!-- Export Entry Form Card -->
         <div class="card" id="exportFormCard">
           <div class="card-title-row">
-            <h3 class="card-title">📦 <span data-i18n="newExportTitle">புதிய ஏற்றுமதி பதிவு (Dispatch Entry)</span></h3>
+            <h3 class="card-title"><svg class="export-inline-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m4 7 8-4 8 4-8 4-8-4Z"/><path d="m4 7v10l8 4 8-4V7M12 11v10"/></svg><span data-i18n="newExportTitle">புதிய ஏற்றுமதி பதிவு (Dispatch Entry)</span></h3>
             <span class="export-stock-badge">
-              <span>📦</span> <span data-i18n="stockAvailableLabel">கையிருப்பு:</span> <strong id="expAvailableStockVal">0</strong> <span data-i18n="unitBoxes">Boxes</span>
+              <svg class="export-action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m4 7 8-4 8 4-8 4-8-4Z"/><path d="m4 7v10l8 4 8-4V7M12 11v10"/></svg><span data-i18n="stockAvailableLabel">கையிருப்பு:</span> <strong id="expAvailableStockVal">0</strong> <span data-i18n="unitBoxes">Boxes</span>
             </span>
           </div>
 
@@ -119,10 +118,10 @@
             <div id="expDuplicateAlert" class="duplicate-alert-banner" style="display: none;">
               <div class="duplicate-alert-content">
                 <div class="duplicate-alert-info">
-                  <span class="duplicate-alert-icon">⚠️</span>
+                  <svg class="export-action-icon duplicate-alert-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 4 9 16H3L12 4Z"/><path d="M12 9v5M12 17h.01"/></svg>
                   <div>
                     <div class="duplicate-alert-title" id="expAlertTitle" data-i18n="duplicateExportWarning">
-                      ⚠️ இந்த தேதியில் ஏற்கனவே ஏற்றுமதி பதிவு உள்ளது!
+                      இந்த தேதியில் ஏற்கனவே ஏற்றுமதி பதிவு உள்ளது!
                     </div>
                     <div class="duplicate-alert-desc" id="expAlertDesc">
                       ஒரே தேதியில் நகல் பதிவு அனுமதிக்கப்படாது. ஏற்கனவே உள்ள பதிவைத் திருத்த விரும்புகிறீர்களா?
@@ -131,10 +130,10 @@
                 </div>
                 <div class="duplicate-alert-actions">
                   <button type="button" class="btn-primary" style="min-height: 32px; padding: 4px 12px; font-size: 12.5px;" onclick="loadExistingExportForEdit()">
-                    <span>✏️</span> <span data-i18n="editExistingBtn">இந்த பதிவைத் திருத்து</span>
+                    <svg class="export-action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m4 16-.8 4.8L8 20l10.5-10.5-4-4L4 16Z"/><path d="m13 7 4 4"/></svg><span data-i18n="editExistingBtn">இந்த பதிவைத் திருத்து</span>
                   </button>
                   <button type="button" class="btn-secondary" style="min-height: 32px; padding: 4px 10px; font-size: 12px;" onclick="dismissExportDuplicateAlert()">
-                    ✕
+                    <svg class="export-action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
                   </button>
                 </div>
               </div>
@@ -142,9 +141,9 @@
 
             <!-- Edit Mode Status Badge -->
             <div id="expEditModeBadge" class="edit-mode-indicator" style="display: none;">
-              <span id="expEditModeText" class="edit-mode-indicator-text">✏️ ஏற்றுமதி பதிவு திருத்தும் நிலையில் உள்ளது</span>
+              <span id="expEditModeText" class="edit-mode-indicator-text"><svg class="export-action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m4 16-.8 4.8L8 20l10.5-10.5-4-4L4 16Z"/><path d="m13 7 4 4"/></svg> ஏற்றுமதி பதிவு திருத்தும் நிலையில் உள்ளது</span>
               <button type="button" class="btn-secondary" style="min-height: 28px; padding: 2px 10px; font-size: 12px;" onclick="cancelEditExport()">
-                ✕ <span data-i18n="cancelBtn">ரத்து செய்</span>
+                <svg class="export-action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg><span data-i18n="cancelBtn">ரத்து செய்</span>
               </button>
             </div>
 
@@ -165,7 +164,7 @@
             <!-- Live Calculation Preview Card -->
             <div class="calc-preview-card">
               <div class="calc-preview-title">
-                <span>⚡</span> <span data-i18n="calcPreviewTitle">உடனடி நேரடி கணக்கீடு (Live Preview)</span>
+                <svg class="export-action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m13 2-9 12h7l-1 8 9-12h-7l1-8Z"/></svg><span data-i18n="calcPreviewTitle">உடனடி நேரடி கணக்கீடு (Live Preview)</span>
               </div>
               <div class="calc-chips-grid">
                 <div class="calc-chip">
@@ -179,6 +178,14 @@
                 <div class="calc-chip">
                   <span class="calc-chip-label" data-i18n="calcBeedis">பீடிகள் (Beedis)</span>
                   <span class="calc-chip-val" id="prevExpBeedis">0</span>
+                </div>
+                <div class="calc-chip">
+                  <span class="calc-chip-label">Tobacco required</span>
+                  <span class="calc-chip-val" id="prevExpTobacco">0 kg</span>
+                </div>
+                <div class="calc-chip">
+                  <span class="calc-chip-label">Tobacco powder required</span>
+                  <span class="calc-chip-val" id="prevExpPowder">0 kg</span>
                 </div>
                 <div class="calc-chip highlight-rate">
                   <span class="calc-chip-label" data-i18n="calcRate">Rate மதிப்பு (₹2,040/Bx)</span>
@@ -216,7 +223,7 @@
 
             <div style="display: flex; gap: 10px; margin-top: 6px;">
               <button type="submit" id="expSubmitBtn" class="btn-primary" style="flex: 1;">
-                <span id="expSubmitIcon">🚚</span> <span id="expSubmitText" data-i18n="saveExportBtn">ஏற்றுமதியைச் சேமிக்கவும்</span>
+                <svg id="expSubmitIcon" class="export-action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h11v11H3zM14 10h4l3 3v4h-7z"/><circle cx="7" cy="19" r="2"/><circle cx="18" cy="19" r="2"/></svg> <span id="expSubmitText" data-i18n="saveExportBtn">ஏற்றுமதியைச் சேமிக்கவும்</span>
               </button>
               <button type="button" id="btnCancelEditExp" class="btn-secondary" style="display: none;" onclick="cancelEditExport()" data-i18n="cancelBtn">
                 ரத்து
@@ -229,13 +236,13 @@
         <div class="card">
           <div class="card-title-row">
             <div>
-              <h3 class="card-title">📊 <span data-i18n="chartExportTrackingTitle">ஏற்றுமதி கண்காணிப்பு</span></h3>
+              <h3 class="card-title"><svg class="export-inline-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19V10M12 19V5M19 19v-7"/><path d="M3 19h18"/></svg><span data-i18n="chartExportTrackingTitle">ஏற்றுமதி கண்காணிப்பு</span></h3>
               <p class="section-subtitle" style="margin: 4px 0 0;" data-i18n="chartExportTrackingSub">முந்தைய ஏற்றுமதி போக்கு & பகுப்பாய்வு</p>
             </div>
             <div class="chart-filter-group" id="exportChartFilterGroup">
-              <button type="button" class="chart-filter-btn active" id="exportFilterDay" onclick="switchExportChartFilter('day')">📅 <span data-i18n="chartDayFilter">நாள்</span></button>
-              <button type="button" class="chart-filter-btn" id="exportFilterWeek" onclick="switchExportChartFilter('week')">📆 <span data-i18n="chartWeekFilter">வாரம்</span></button>
-              <button type="button" class="chart-filter-btn" id="exportFilterMonth" onclick="switchExportChartFilter('month')">🗓️ <span data-i18n="chartMonthFilter">மாதம்</span></button>
+              <button type="button" class="chart-filter-btn active" id="exportFilterDay" onclick="switchExportChartFilter('day')"><svg class="export-action-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4M16 3v4M4 10h16"/></svg><span data-i18n="chartDayFilter">நாள்</span></button>
+              <button type="button" class="chart-filter-btn" id="exportFilterWeek" onclick="switchExportChartFilter('week')"><svg class="export-action-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4M16 3v4M4 10h16M8 14h2M14 14h2M8 17h2"/></svg><span data-i18n="chartWeekFilter">வாரம்</span></button>
+              <button type="button" class="chart-filter-btn" id="exportFilterMonth" onclick="switchExportChartFilter('month')"><svg class="export-action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19V10M12 19V5M19 19v-7"/><path d="M3 19h18"/></svg><span data-i18n="chartMonthFilter">மாதம்</span></button>
             </div>
           </div>
           <div class="chart-canvas-wrapper" style="height: 290px;">
@@ -246,7 +253,7 @@
         <!-- Dispatch Ledger & Filters Card -->
         <div class="card">
           <div class="card-title-row">
-            <h3 class="card-title">📜 <span data-i18n="exportHistoryTitle">ஏற்றுமதி பதிவுகள் வரலாறு (Dispatch Ledger)</span></h3>
+            <h3 class="card-title"><svg class="export-inline-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h10v18H7zM10 7h4M10 11h4M10 15h4"/></svg><span data-i18n="exportHistoryTitle">ஏற்றுமதி பதிவுகள் வரலாறு (Dispatch Ledger)</span></h3>
           </div>
 
           <!-- Quick Filters Row -->
@@ -277,7 +284,7 @@
                 வடிகட்டு
               </button>
               <button type="button" class="btn-pdf-download" id="btnDownloadExportPDF" style="min-height: 38px; padding: 6px 14px;" onclick="downloadExportPDF()">
-                <span>📄</span> <span data-i18n="downloadPDFBtn">PDF பதிவிறக்கு</span>
+                <svg class="export-action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3.5h8l4 4V20.5H6z"/><path d="M14 3.5v4h4M8.5 13h7M8.5 16h5"/></svg><span data-i18n="downloadPDFBtn">PDF பதிவிறக்கு</span>
               </button>
               <label class="toggle-control" title="Include commission in report totals">
                 <input type="checkbox" id="includeCommissionToggle" checked onchange="toggleExportCommission(this.checked)">
@@ -318,10 +325,6 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
         <span data-i18n="navDashboard">முகப்பு</span>
       </a>
-      <a href="/production" class="nav-item">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M2 20h20M7 20V10l5 3V4l7 5v11"/></svg>
-        <span data-i18n="navProduction">உற்பத்தி</span>
-      </a>
       <a href="/stock" class="nav-item">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
         <span data-i18n="navStock">இருப்பு</span>
@@ -348,12 +351,9 @@
   </div>
 
   <!-- Scripts -->
-  <script src="/js/html2canvas.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="/js/html2pdf.bundle.min.js"></script>
   <script src="/js/chart.umd.min.js"></script>
   <script src="/js/i18n.js?v=20260921-2"></script>
   <script src="/js/common.js?v=20260921-2"></script>
-  <script src="/js/export.js?v=20260921-2"></script>
+  <script src="/js/export.js?v=20261024-2"></script>
 </body>
 </html>

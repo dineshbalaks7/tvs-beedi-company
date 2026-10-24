@@ -15,7 +15,7 @@
   
   <!-- Stylesheets -->
   <link rel="stylesheet" href="/css/common.css">
-  <link rel="stylesheet" href="/css/stock.css">
+  <link rel="stylesheet" href="/css/stock.css?v=20261024-7">
 </head>
 <body>
   <div class="app-container">
@@ -32,7 +32,7 @@
         </div>
       </div>
       <div class="header-actions">
-        <button id="themeToggleBtn" class="lang-btn" onclick="toggleTheme()" title="Theme">🌙 இரவு</button>
+        <button id="themeToggleBtn" class="lang-btn" onclick="toggleTheme()" title="Theme"><svg class="stock-inline-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 15.5A8 8 0 0 1 8.5 4 8 8 0 1 0 20 15.5Z"/></svg><span data-i18n="darkMode">இரவு</span></button>
         <div id="langSwitcher" class="lang-switcher-pill" onclick="toggleLanguage()" role="button" aria-label="Switch Language" title="Switch Language / மொழியை மாற்ற">
           <span id="langChipTa" class="lang-segment active">தமிழ்</span>
           <span id="langChipEn" class="lang-segment">EN</span>
@@ -47,7 +47,7 @@
     <main class="main-content">
       <section id="view-stock" class="tab-view active">
         <div class="section-title-wrap">
-          <h2 class="section-title">📦 <span data-i18n="stockTitle">சரக்கு இருப்பு & பயன்பாடு</span></h2>
+          <h2 class="section-title"><svg class="stock-inline-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m4 7 8-4 8 4-8 4-8-4Z"/><path d="m4 7v10l8 4 8-4V7M12 11v10"/></svg><span data-i18n="stockTitle">சரக்கு இருப்பு & பயன்பாடு</span></h2>
           <p class="section-subtitle" data-i18n="stockSub">புகையிலை & தூள் இருப்பு நிலவரம் மற்றும் நேரடி நுகர்வு அறிக்கை</p>
         </div>
 
@@ -84,7 +84,7 @@
         <div class="card">
           <div class="card-title-row">
             <div>
-              <h3 class="card-title">🍃 <span data-i18n="consumptionReportingTitle">பொருட்கள் பயன்பாடு அறிக்கை (Consumption Matrix)</span></h3>
+              <h3 class="card-title"><svg class="stock-inline-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 4C11 4 5 8 5 14c0 3 2 5 5 5 6 0 10-6 10-15Z"/><path d="M4 21c3-6 7-9 13-12"/></svg><span data-i18n="consumptionReportingTitle">பொருட்கள் பயன்பாடு அறிக்கை (Consumption Matrix)</span></h3>
               <p class="section-subtitle" style="margin-top: 4px; margin-bottom: 0;" data-i18n="consumptionReportingSub">
                 உற்பத்திக்கு நுகரப்பட்ட மூலப்பொருட்களின் விரிவான அறிக்கை
               </p>
@@ -93,7 +93,7 @@
 
           <div class="consumption-report-grid">
             <div class="consumption-card">
-              <div class="consumption-card-title">📅 <span data-i18n="reportToday">இன்று (Today)</span></div>
+              <div class="consumption-card-title"><svg class="stock-inline-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4M16 3v4M4 10h16"/></svg><span data-i18n="reportToday">இன்று (Today)</span></div>
               <div class="consumption-card-metric">
                 <span class="consumption-metric-label">Tobacco:</span>
                 <span class="consumption-metric-val" id="stockRepTodayTobacco">0 kg</span>
@@ -109,7 +109,7 @@
             </div>
 
             <div class="consumption-card">
-              <div class="consumption-card-title">📆 <span data-i18n="reportWeek">இந்த வாரம் (This Week)</span></div>
+              <div class="consumption-card-title"><svg class="stock-inline-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4M16 3v4M4 10h16M8 14h2M14 14h2M8 17h2"/></svg><span data-i18n="reportWeek">இந்த வாரம் (This Week)</span></div>
               <div class="consumption-card-metric">
                 <span class="consumption-metric-label">Tobacco:</span>
                 <span class="consumption-metric-val" id="stockRepWeekTobacco">0 kg</span>
@@ -125,7 +125,7 @@
             </div>
 
             <div class="consumption-card">
-              <div class="consumption-card-title">📊 <span data-i18n="reportMonth">இந்த மாதம் (This Month)</span></div>
+              <div class="consumption-card-title"><svg class="stock-inline-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19V10M12 19V5M19 19v-7"/><path d="M3 19h18"/></svg><span data-i18n="reportMonth">இந்த மாதம் (This Month)</span></div>
               <div class="consumption-card-metric">
                 <span class="consumption-metric-label">Tobacco:</span>
                 <span class="consumption-metric-val" id="stockRepMonthTobacco">0 kg</span>
@@ -141,7 +141,7 @@
             </div>
 
             <div class="consumption-card">
-              <div class="consumption-card-title">📈 <span data-i18n="reportTotal">மொத்த பயன்பாடு (All Time)</span></div>
+              <div class="consumption-card-title"><svg class="stock-inline-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m4 16 5-5 4 3 7-8"/><path d="M15 6h5v5"/></svg><span data-i18n="reportTotal">மொத்த பயன்பாடு (All Time)</span></div>
               <div class="consumption-card-metric">
                 <span class="consumption-metric-label">Tobacco:</span>
                 <span class="consumption-metric-val" id="stockRepTotalTobacco">0 kg</span>
@@ -159,9 +159,9 @@
         </div>
 
         <!-- Bag Calculator Utility Card -->
-        <div class="card">
+        <div class="card stock-optional-section" id="stockBagCalculatorCard">
           <div class="card-title-row">
-            <h3 class="card-title">🧮 <span data-i18n="bagCalcTitle">பைகள் கணக்கீட்டு கருவி (Bag Calculator)</span></h3>
+            <h3 class="card-title"><svg class="stock-inline-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 8h8M8 12h2M14 12h2M8 16h2M14 16h2"/></svg><span data-i18n="bagCalcTitle">பைகள் கணக்கீட்டு கருவி (Bag Calculator)</span></h3>
             <span class="badge badge-accent" id="bagCalcRatioBadge" style="font-size: 11px; font-weight: 700;">550g / Bag</span>
           </div>
           <p class="section-subtitle" style="margin-bottom: 14px;" data-i18n="bagCalcSub" id="bagCalcSubtitle">
@@ -172,7 +172,7 @@
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
                 <label class="form-label" for="bagCalcTotalKg" style="margin-bottom: 0;" data-i18n="bagCalcTotalLabel">மொத்த எடை (Total Weight in kg)</label>
                 <button type="button" id="btnUseCurrentStockTobacco" class="btn-secondary" style="display: none; padding: 2px 8px; font-size: 11px; border-radius: 4px; border: 1px solid var(--border);" onclick="useCurrentTobaccoForBagCalc()">
-                  🍃 <span id="btnUseCurrentStockTobaccoText">நடப்பு இருப்பு</span>
+                  <svg class="stock-action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 4C11 4 5 8 5 14c0 3 2 5 5 5 6 0 10-6 10-15Z"/><path d="M4 21c3-6 7-9 13-12"/></svg><span id="btnUseCurrentStockTobaccoText">நடப்பு இருப்பு</span>
                 </button>
               </div>
               <input type="number" id="bagCalcTotalKg" class="form-input" value="35" min="1" step="0.5" oninput="runBagCalculator()">
@@ -200,7 +200,7 @@
         <div class="card" id="stockReportCard">
           <div class="card-title-row">
             <div>
-              <h3 class="card-title">🖼️ <span data-i18n="monthlyStockReportTitle">உள்வரும் சரக்கு அறிக்கை (Incoming Stock Report)</span></h3>
+              <h3 class="card-title"><span class="stock-section-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4h13A1.5 1.5 0 0 1 20 5.5v13a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18.5v-13Z"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m5.5 17 4.2-4.2a1 1 0 0 1 1.4 0l2 2 1.6-1.6a1 1 0 0 1 1.4 0l2.4 2.4"/></svg></span> <span data-i18n="monthlyStockReportTitle">உள்வரும் சரக்கு அறிக்கை (Incoming Stock Report)</span></h3>
               <p class="section-subtitle" style="margin-top: 4px; margin-bottom: 0;" data-i18n="monthlyStockReportSub">
                 பொருட்கள் வாரியாக (இலை / தூள்) மற்றும் தேதி வாரியாக உள்வரும் சரக்கு விவரங்கள் மற்றும் படம் (Image) பதிவிறக்கம்
               </p>
@@ -247,16 +247,16 @@
             </div>
             <div class="stock-report-btn-group">
               <button type="button" class="btn-primary" id="btnDownloadStockImage" onclick="downloadStockImage()">
-                <span>🖼️</span> <span data-i18n="downloadImageBtn">படம் பதிவிறக்கு (Image)</span>
+                <svg class="stock-action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4h13A1.5 1.5 0 0 1 20 5.5v13a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18.5v-13Z"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m5.5 17 4.2-4.2a1 1 0 0 1 1.4 0l2 2 1.6-1.6a1 1 0 0 1 1.4 0l2.4 2.4"/></svg> <span data-i18n="downloadImageBtn">படம் பதிவிறக்கு (Image)</span>
               </button>
               <button type="button" class="btn-primary" id="btnDownloadStockPDF" onclick="downloadStockPDF()" style="background: linear-gradient(135deg, #dc2626, #b91c1c); box-shadow: 0 4px 14px rgba(220,38,38,0.3);">
-                <span>📄</span> <span data-i18n="downloadPDFBtn">PDF பதிவிறக்கு</span>
+                <svg class="stock-action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3.5h8l4 4V20.5H6z"/><path d="M14 3.5v4h4M8.5 13h7M8.5 16h5"/></svg> <span data-i18n="downloadPDFBtn">PDF பதிவிறக்கு</span>
               </button>
               <button type="button" class="btn-secondary" id="btnPreviewStockReport" onclick="previewMonthlyStockReport()">
-                <span>👁️</span> <span data-i18n="previewReportBtn">முன்னோட்டம்</span>
+                <svg class="stock-action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"/><circle cx="12" cy="12" r="2.5"/></svg> <span data-i18n="previewReportBtn">முன்னோட்டம்</span>
               </button>
               <button type="button" class="btn-secondary" id="btnPrintStockReport" onclick="printMonthlyStockReport()">
-                <span>🖨️</span> <span data-i18n="printReportBtn">அச்சிடு</span>
+                <svg class="stock-action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 9V4h10v5M7 17H5.5A1.5 1.5 0 0 1 4 15.5v-4A1.5 1.5 0 0 1 5.5 10h13a1.5 1.5 0 0 1 1.5 1.5v4a1.5 1.5 0 0 1-1.5 1.5H17M7 14h10v6H7z"/><circle cx="17.5" cy="12.5" r=".75"/></svg> <span data-i18n="printReportBtn">அச்சிடு</span>
               </button>
             </div>
           </div>
@@ -302,7 +302,7 @@
         <div class="card" id="stockMovementsLedgerCard">
           <div class="card-title-row">
             <div>
-              <h3 class="card-title">📜 <span data-i18n="movementsTitle">சரக்கு இயக்க வரலாறு (Stock Movements Ledger)</span></h3>
+              <h3 class="card-title"><svg class="stock-inline-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h10v18H7zM10 7h4M10 11h4M10 15h4"/></svg><span data-i18n="movementsTitle">சரக்கு இயக்க வரலாறு (Stock Movements Ledger)</span></h3>
               <p class="section-subtitle" style="margin-top: 4px; margin-bottom: 0;" data-i18n="movementsSubtitle">
                 புகையிலை மற்றும் தூள் பரிவர்த்தனைகள், உற்பத்தி பயன்பாடு மற்றும் இருப்பு மாற்றங்கள்
               </p>
@@ -341,7 +341,7 @@
 
               <div class="stock-ledger-actions">
                 <button type="button" class="btn-secondary btn-sm" id="btnResetStockLedgerFilter" onclick="resetStockLedgerFilters()" title="Reset Filters">
-                  <span>🔄</span> <span data-i18n="ledgerClearFilters">மீட்டமை</span>
+                  <svg class="stock-action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 0 1 13.5-5.8L20 9"/><path d="M20 5v4h-4M20 12a8 8 0 0 1-13.5 5.8L4 15"/><path d="M4 19v-4h4"/></svg><span data-i18n="ledgerClearFilters">மீட்டமை</span>
                 </button>
               </div>
             </div>
@@ -420,7 +420,7 @@
             </datalist>
           </div>
           <button type="submit" class="btn-primary" style="margin-top: 10px;">
-              <span>💾</span> <span id="stockActionSubmitBtn" data-i18n="saveBtn">சேமிக்கவும்</span>
+              <svg class="stock-action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h12l2 2v14H5z"/><path d="M8 4v6h8V4M8 16h8"/></svg><span id="stockActionSubmitBtn" data-i18n="saveBtn">சேமிக்கவும்</span>
           </button>
         </form>
       </div>
@@ -463,7 +463,7 @@
     <div id="stockReportPreviewModal" class="modal-overlay">
       <div class="modal-dialog modal-lg">
         <div class="modal-header">
-          <h3 style="color: var(--accent-gold); font-size: 16px;">📑 <span id="reportModalTitle">மாதாந்திர சரக்கு அறிக்கை (Stock Audit Statement)</span></h3>
+          <h3 style="color: var(--accent-gold); font-size: 16px;"><svg class="stock-inline-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h9l3 3v15H6z"/><path d="M15 3v4h3M9 11h6M9 15h6"/></svg><span id="reportModalTitle">மாதாந்திர சரக்கு அறிக்கை (Stock Audit Statement)</span></h3>
           <button class="modal-close-btn" onclick="closeStockReportPreviewModal()">&times;</button>
         </div>
         <div class="modal-body-scrollable">
@@ -473,13 +473,13 @@
         </div>
         <div class="modal-actions-row" style="margin-top: 14px; display: flex; justify-content: flex-end; gap: 8px;">
           <button type="button" class="btn-secondary" onclick="closeStockReportPreviewModal()">
-            <span>✕</span> <span data-i18n="cancelBtn">மூடு</span>
+            <svg class="stock-action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg><span data-i18n="cancelBtn">மூடு</span>
           </button>
           <button type="button" class="btn-secondary" onclick="printMonthlyStockReport()">
-            <span>🖨️</span> <span data-i18n="printReportBtn">அச்சிடு</span>
+            <svg class="stock-action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 9V4h10v5M7 17H5.5A1.5 1.5 0 0 1 4 15.5v-4A1.5 1.5 0 0 1 5.5 10h13a1.5 1.5 0 0 1 1.5 1.5v4a1.5 1.5 0 0 1-1.5 1.5H17M7 14h10v6H7z"/><circle cx="17.5" cy="12.5" r=".75"/></svg> <span data-i18n="printReportBtn">அச்சிடு</span>
           </button>
           <button type="button" class="btn-primary" onclick="downloadStockImage()">
-            <span>🖼️</span> <span data-i18n="downloadImageBtn">படம் பதிவிறக்கு</span>
+            <svg class="stock-action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4h13A1.5 1.5 0 0 1 20 5.5v13a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18.5v-13Z"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m5.5 17 4.2-4.2a1 1 0 0 1 1.4 0l2 2 1.6-1.6a1 1 0 0 1 1.4 0l2.4 2.4"/></svg> <span data-i18n="downloadImageBtn">படம் பதிவிறக்கு</span>
           </button>
         </div>
       </div>
@@ -495,10 +495,6 @@
       <a href="/dashboard" class="nav-item">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
         <span data-i18n="navDashboard">முகப்பு</span>
-      </a>
-      <a href="/production" class="nav-item">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M2 20h20M7 20V10l5 3V4l7 5v11"/></svg>
-        <span data-i18n="navProduction">உற்பத்தி</span>
       </a>
       <a href="/stock" class="nav-item active">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
@@ -526,11 +522,8 @@
   </div>
 
   <!-- Scripts -->
-  <script src="/js/html2canvas.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="/js/html2pdf.bundle.min.js"></script>
   <script src="/js/i18n.js?v=20260922-2"></script>
   <script src="/js/common.js?v=20260922-2"></script>
-  <script src="/js/stock.js?v=20260922-2"></script>
+  <script src="/js/stock.js?v=20261024-3"></script>
 </body>
 </html>

@@ -4,6 +4,52 @@
  */
 
 let cachedStock = null;
+let stockExportLibrariesPromise = null;
+
+function loadStockExportScript(src, ready) {
+  if (ready()) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const existing = document.querySelector(`script[data-stock-export-src="${src}"]`);
+    if (existing) {
+      existing.addEventListener('load', resolve, { once: true });
+      existing.addEventListener('error', () => reject(new Error(`Unable to load ${src}`)), { once: true });
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = src;
+    script.async = true;
+    script.dataset.stockExportSrc = src;
+    script.onload = resolve;
+    script.onerror = () => reject(new Error(`Unable to load ${src}`));
+    document.head.appendChild(script);
+  });
+}
+
+function ensureStockExportLibraries(includePdf = false) {
+  const canvasReady = () => typeof window.html2canvas !== 'undefined';
+  const pdfReady = () => Boolean(window.jspdf?.jsPDF);
+  if (canvasReady() && (!includePdf || pdfReady())) return Promise.resolve();
+  if (!stockExportLibrariesPromise) {
+    const scripts = [loadStockExportScript('/js/html2canvas.min.js', canvasReady)];
+    if (includePdf) {
+      scripts.push(loadStockExportScript(
+        'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
+        pdfReady
+      ));
+    }
+    stockExportLibrariesPromise = Promise.all(scripts).catch(error => {
+      stockExportLibrariesPromise = null;
+      throw error;
+    });
+  }
+  return stockExportLibrariesPromise.then(() => {
+    if (includePdf && !pdfReady()) {
+      stockExportLibrariesPromise = null;
+      return ensureStockExportLibraries(true);
+    }
+    return undefined;
+  });
+}
 
 // Stock Movement Ledger State (Filters & 10 records/page pagination)
 const stockLedgerState = {
@@ -14,31 +60,51 @@ const stockLedgerState = {
   pageSize: 10
 };
 
-function getMovementISODate(dateVal) {
-  if (!dateVal) return '';
-  if (typeof dateVal === 'string') {
-    const match = dateVal.match(/^(\d{4})-(\d{2})-(\d{2})/);
-    if (match) return `${match[1]}-${match[2]}-${match[3]}`;
-  }
-  const d = new Date(dateVal);
-  if (isNaN(d.getTime())) return '';
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-}
-
 async function loadStockData() {
   try {
-    const res = await fetch('/api/stock');
+    const res = await fetch(`/api/stock?${buildStockMovementQuery()}`);
     if (!res.ok) throw new Error('Failed to load stock data');
     const data = await res.json();
     cachedStock = data;
+    if (data.movementPagination && stockLedgerState.page > data.movementPagination.totalPages) {
+      stockLedgerState.page = data.movementPagination.totalPages;
+      return loadStockData();
+    }
     renderStockUI(data);
   } catch (err) {
     console.error('Error loading stock data:', err);
     showDataLoadError('stockMovementsTableBody', 'Unable to load stock records');
     showToast('Failed to load stock data', 'error');
+  }
+}
+
+function buildStockMovementQuery() {
+  const params = new URLSearchParams({
+    page: String(stockLedgerState.page),
+    limit: String(stockLedgerState.pageSize)
+  });
+  if (stockLedgerState.item !== 'all') params.set('item', stockLedgerState.item);
+  if (stockLedgerState.fromDate) params.set('from', stockLedgerState.fromDate);
+  if (stockLedgerState.toDate) params.set('to', stockLedgerState.toDate);
+  return params.toString();
+}
+
+async function loadStockMovements() {
+  if (!cachedStock) return;
+  try {
+    const res = await fetch(`/api/stock/movements?${buildStockMovementQuery()}`);
+    if (!res.ok) throw new Error('Failed to load stock movements');
+    const data = await res.json();
+    if (stockLedgerState.page > data.totalPages) {
+      stockLedgerState.page = data.totalPages;
+      return loadStockMovements();
+    }
+    cachedStock.movements = data.movements || [];
+    cachedStock.movementPagination = data;
+    renderStockLedgerTable();
+  } catch (error) {
+    console.error('Error loading stock movements:', error);
+    showToast('Failed to load stock movements', 'error');
   }
 }
 
@@ -144,7 +210,7 @@ function onStockLedgerFilterChange() {
     btn.classList.remove('active');
   });
 
-  renderStockLedgerTable();
+  loadStockMovements();
 }
 
 function setStockLedgerDatePreset(preset) {
@@ -198,7 +264,7 @@ function setStockLedgerDatePreset(preset) {
   const targetBtn = document.getElementById(presetMap[preset]);
   if (targetBtn) targetBtn.classList.add('active');
 
-  renderStockLedgerTable();
+  loadStockMovements();
 }
 
 function resetStockLedgerFilters() {
@@ -221,7 +287,7 @@ function resetStockLedgerFilters() {
   const btnAll = document.getElementById('btnLedgerPresetAll');
   if (btnAll) btnAll.classList.add('active');
 
-  renderStockLedgerTable();
+  loadStockMovements();
 }
 
 function changeStockLedgerPage(delta) {
@@ -230,7 +296,7 @@ function changeStockLedgerPage(delta) {
 
 function goToStockLedgerPage(targetPage) {
   stockLedgerState.page = targetPage;
-  renderStockLedgerTable();
+  loadStockMovements();
   const card = document.getElementById('stockMovementsLedgerCard');
   if (card) {
     const rect = card.getBoundingClientRect();
@@ -246,32 +312,15 @@ function renderStockLedgerTable() {
 
   const isEn = (typeof currentLanguage !== 'undefined' && currentLanguage === 'en');
   const movements = cachedStock?.movements || [];
-
-  // Filter by Material & Date
-  const filtered = movements.filter(m => {
-    if (stockLedgerState.item !== 'all' && m.item !== stockLedgerState.item) {
-      return false;
-    }
-    const isoDate = getMovementISODate(m.date || m.createdAt);
-    if (stockLedgerState.fromDate && isoDate < stockLedgerState.fromDate) {
-      return false;
-    }
-    if (stockLedgerState.toDate && isoDate > stockLedgerState.toDate) {
-      return false;
-    }
-    return true;
-  });
-
-  const totalRecords = filtered.length;
-  const pageSize = stockLedgerState.pageSize || 10;
-  const totalPages = Math.max(1, Math.ceil(totalRecords / pageSize));
-
-  if (stockLedgerState.page > totalPages) stockLedgerState.page = totalPages;
-  if (stockLedgerState.page < 1) stockLedgerState.page = 1;
-
-  const startIndex = (stockLedgerState.page - 1) * pageSize;
-  const endIndex = Math.min(startIndex + pageSize, totalRecords);
-  const pageRecords = filtered.slice(startIndex, endIndex);
+  const pagination = cachedStock?.movementPagination || {};
+  const totalRecords = pagination.total ?? movements.length;
+  const pageSize = pagination.pageSize || stockLedgerState.pageSize || 10;
+  const totalPages = pagination.totalPages || Math.max(1, Math.ceil(totalRecords / pageSize));
+  const currentPage = pagination.currentPage || stockLedgerState.page;
+  stockLedgerState.page = currentPage;
+  const startIndex = totalRecords ? (currentPage - 1) * pageSize : 0;
+  const endIndex = Math.min(startIndex + movements.length, totalRecords);
+  const pageRecords = movements;
 
   // Update badge on card
   const badgeEl = document.getElementById('ledgerActiveCountBadge');
@@ -300,12 +349,12 @@ function renderStockLedgerTable() {
     tbody.innerHTML = `
       <tr>
         <td colspan="7" style="text-align:center; padding: 32px 16px; color: var(--text-dim);">
-          <div style="font-size: 26px; margin-bottom: 8px;">🔍</div>
+          <svg class="stock-empty-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/></svg>
           <div style="font-size: 14px; font-weight: 500;">
             ${isEn ? 'No stock movement records found matching the filter criteria' : 'தேர்ந்தெடுக்கப்பட்ட வடிகட்டலில் சரக்கு இயக்க பதிவுகள் எதுவும் இல்லை'}
           </div>
           <button type="button" class="btn-secondary btn-sm" onclick="resetStockLedgerFilters()" style="margin-top: 12px; display: inline-flex; align-items: center; gap: 4px; padding: 6px 12px;">
-            <span>🔄</span> <span>${isEn ? 'Reset Filters' : 'வடிகட்டலை மீட்டமை'}</span>
+            <svg class="stock-action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 0 1 13.5-5.8L20 9"/><path d="M20 5v4h-4M20 12a8 8 0 0 1-13.5 5.8L4 15"/><path d="M4 19v-4h4"/></svg><span>${isEn ? 'Reset Filters' : 'வடிகட்டலை மீட்டமை'}</span>
           </button>
         </td>
       </tr>
@@ -330,7 +379,7 @@ function renderStockLedgerTable() {
           <td style="color: var(--text-muted); font-size: 12px;">${m.notes || '-'}</td>
           <td>
             <div style="display: flex; gap: 6px; align-items: center;">
-              <button class="btn-action-edit" onclick="openEditStockMovementModal('${m._id}')" title="${isEn ? 'Edit' : 'திருத்து'}">✏️</button>
+              <button class="btn-action-edit" onclick="openEditStockMovementModal('${m._id}')" title="${isEn ? 'Edit' : 'திருத்து'}"><svg class="stock-action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m4 16-.8 4.8L8 20l10.5-10.5-4-4L4 16Z"/><path d="m13 7 4 4"/></svg></button>
               <button class="btn-danger btn-table-action" onclick="deleteStockMovementAction('${m._id}')" title="${isEn ? 'Delete' : 'நீக்கு'}">✕</button>
             </div>
           </td>
@@ -346,18 +395,18 @@ function renderStockLedgerTable() {
       infoEl.textContent = isEn ? 'Showing 0 records' : 'காட்டுவது 0 பதிவுகள்';
     } else {
       infoEl.textContent = isEn
-        ? `Showing ${startIndex + 1}-${endIndex} of ${totalRecords} records (Page ${stockLedgerState.page} of ${totalPages})`
-        : `காட்டுவது ${startIndex + 1}-${endIndex} / மொத்தம் ${totalRecords} பதிவுகள் (பக்கம் ${stockLedgerState.page} / ${totalPages})`;
+        ? `Showing ${startIndex + 1}-${endIndex} of ${totalRecords} records (Page ${currentPage} of ${totalPages})`
+        : `காட்டுவது ${startIndex + 1}-${endIndex} / மொத்தம் ${totalRecords} பதிவுகள் (பக்கம் ${currentPage} / ${totalPages})`;
     }
   }
 
   const prevBtn = document.getElementById('btnLedgerPrevPage');
   const nextBtn = document.getElementById('btnLedgerNextPage');
   if (prevBtn) {
-    prevBtn.disabled = (stockLedgerState.page <= 1);
+    prevBtn.disabled = (currentPage <= 1);
   }
   if (nextBtn) {
-    nextBtn.disabled = (stockLedgerState.page >= totalPages || totalRecords === 0);
+    nextBtn.disabled = (currentPage >= totalPages || totalRecords === 0);
   }
 
   const numbersEl = document.getElementById('stockLedgerPageNumbers');
@@ -366,7 +415,7 @@ function renderStockLedgerTable() {
       numbersEl.innerHTML = '';
     } else {
       let pageHtml = '';
-      const cur = stockLedgerState.page;
+      const cur = currentPage;
 
       if (totalPages <= 7) {
         for (let p = 1; p <= totalPages; p++) {
@@ -1055,7 +1104,7 @@ function generateStockReportHTML(data) {
       const displayKg = isUsage ? `-${e.kg}` : (data.includeUsage ? `+${e.kg}` : `${e.kg}`);
       const materialDisplay = e.item === 'powder' ? 'Powder (தூள்)' : 'Tobacco (இலை)';
       const typeDisplay = isUsage
-        ? `<span style="color: #b91c1c; font-weight: 600;">🔻 ${e.typeLabel}</span>`
+        ? `<span style="color: #b91c1c; font-weight: 600;"><svg class="stock-action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg> ${e.typeLabel}</span>`
         : e.typeLabel;
 
       return `
@@ -1113,6 +1162,14 @@ function generateStockReportHTML(data) {
 }
 
 async function downloadStockImage() {
+  const exportIsEn = (typeof currentLanguage !== 'undefined' && currentLanguage === 'en');
+  try {
+    await ensureStockExportLibraries();
+  } catch (error) {
+    console.error('Unable to load image export library:', error);
+    showToast(exportIsEn ? 'Image export library could not be loaded.' : 'Image export library could not be loaded.', 'error');
+    return;
+  }
   const fromInput = document.getElementById('stockReportFromDate');
   const toInput = document.getElementById('stockReportToDate');
   const itemSelect = document.getElementById('stockReportMaterialFilter');
@@ -1181,6 +1238,14 @@ async function downloadStockImage() {
 }
 
 async function downloadStockPDF() {
+  const pdfExportIsEn = (typeof currentLanguage !== 'undefined' && currentLanguage === 'en');
+  try {
+    await ensureStockExportLibraries(true);
+  } catch (error) {
+    console.error('Unable to load PDF export libraries:', error);
+    showToast(pdfExportIsEn ? 'PDF libraries could not be loaded.' : 'PDF libraries could not be loaded.', 'error');
+    return;
+  }
   const fromInput = document.getElementById('stockReportFromDate');
   const toInput = document.getElementById('stockReportToDate');
   const itemSelect = document.getElementById('stockReportMaterialFilter');

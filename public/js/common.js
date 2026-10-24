@@ -107,6 +107,9 @@ const nativeFetch = window.fetch.bind(window);
 // A page can remain open after its server-side session expires. Redirect it
 // when the next protected request confirms that authentication is no longer valid.
 let pendingRequests = 0;
+let loadingOverlayTimer = null;
+let loadingOverlayVisible = false;
+const LOADING_OVERLAY_DELAY_MS = 250;
 
 window.fetch = async function(...args) {
   const requestUrl = typeof args[0] === 'string' ? args[0] : args[0]?.url || '';
@@ -115,7 +118,15 @@ window.fetch = async function(...args) {
   // Chat has its own inline typing indicator instead of covering the conversation.
   if (!isChatRequest) {
     pendingRequests++;
-    setAppLoading(true, 'Loading...');
+    if (pendingRequests === 1) {
+      loadingOverlayTimer = setTimeout(() => {
+        loadingOverlayTimer = null;
+        if (pendingRequests > 0) {
+          loadingOverlayVisible = true;
+          setAppLoading(true, 'Loading...');
+        }
+      }, LOADING_OVERLAY_DELAY_MS);
+    }
   }
   try {
     const response = await nativeFetch(...args);
@@ -130,7 +141,15 @@ window.fetch = async function(...args) {
     if (!isChatRequest) {
       pendingRequests--;
       if (pendingRequests <= 0) {
-        setAppLoading(false);
+        pendingRequests = 0;
+        if (loadingOverlayTimer !== null) {
+          clearTimeout(loadingOverlayTimer);
+          loadingOverlayTimer = null;
+        }
+        if (loadingOverlayVisible) {
+          loadingOverlayVisible = false;
+          setAppLoading(false);
+        }
       }
     }
   }
@@ -359,6 +378,8 @@ function showToast(message, type = 'info', duration = 3500) {
 
 // 6. Fetch Global Settings
 async function fetchAppSettings() {
+  if (['/', '/dashboard', '/index.html', '/settings', '/settings.html'].includes(window.location.pathname)) return;
+
   try {
     const res = await fetch('/api/settings');
     if (res.ok) {

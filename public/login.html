@@ -120,6 +120,7 @@
           const data = await response.json().catch(() => ({}));
           throw new Error(data.details ? `${data.error} (${data.details})` : (data.error || 'Invalid username or password'));
         }
+        try { sessionStorage.setItem('tvs_show_dashboard_splash', '1'); } catch (_) {}
         window.location.href = '/dashboard';
       } catch (err) {
         error.textContent = err.message;

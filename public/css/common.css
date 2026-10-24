@@ -356,12 +356,24 @@ a {
 
 .lang-segment {
   display: inline-block;
+  min-width: 42px;
   padding: 4px 10px;
   font-size: 12px;
   font-weight: 700;
   border-radius: var(--radius-full);
   color: var(--text-dim);
+  text-align: center;
+  outline: none;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.lang-segment:focus-visible {
+  box-shadow: 0 0 0 3px var(--accent-amber-glow);
+}
+
+.lang-segment:not(.active):hover {
+  color: var(--text-main);
+  background: var(--bg-card-hover);
 }
 
 .lang-segment.active {
@@ -494,6 +506,27 @@ body.lang-transitioning [data-i18n] {
   margin-bottom: 2px;
   stroke-width: 2;
   transition: transform 0.2s ease, stroke 0.2s ease;
+}
+
+@media (max-width: 639px) {
+  .bottom-nav {
+    padding: 0 2px;
+    justify-content: space-between;
+  }
+
+  .nav-item {
+    flex: 1 1 0;
+    min-width: 0;
+    font-size: 9px;
+    padding: 6px 2px;
+    gap: 0;
+  }
+
+  .nav-item svg {
+    width: 18px;
+    height: 18px;
+    margin-bottom: 2px;
+  }
 }
 
 .nav-item.active {

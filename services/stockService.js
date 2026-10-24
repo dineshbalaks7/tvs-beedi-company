@@ -7,13 +7,17 @@
 const Stock = require('../models/Stock');
 const StockMovement = require('../models/StockMovement');
 const Settings = require('../models/Settings');
+// Retained only for historical stock reports; current consumption is Export-led.
 const Production = require('../models/Production');
 const Export = require('../models/Export');
 
-async function getStockSummary() {
-  const tobaccoStock = await Stock.getStock('tobacco');
-  const powderStock = await Stock.getStock('powder');
-  const settings = await Settings.getSettings();
+async function getStockSummary(settingsOverride = null) {
+  const [tobaccoStock, powderStock, storedSettings] = await Promise.all([
+    Stock.getStock('tobacco'),
+    Stock.getStock('powder'),
+    settingsOverride ? Promise.resolve(settingsOverride) : Settings.getSettings()
+  ]);
+  const settings = settingsOverride || storedSettings;
 
   const tobaccoKg = Number((tobaccoStock.quantityGrams / 1000).toFixed(2));
   const powderKg = Number((powderStock.quantityGrams / 1000).toFixed(2));
@@ -27,18 +31,39 @@ async function getStockSummary() {
   const weekStart = new Date(minTodayStart); weekStart.setDate(weekStart.getDate() - 6);
   const monthStart = new Date(y, m - 1, 1, 0, 0, 0, 0);
 
-  const [prodsToday, prodsWeek, prodsMonth, allProds] = await Promise.all([
-    Production.find({ date: { $gte: minTodayStart } }),
-    Production.find({ date: { $gte: weekStart } }),
-    Production.find({ date: { $gte: monthStart } }),
-    Production.find()
+  const exportTotals = {
+    tobaccoGrams: { $sum: { $ifNull: ['$tobaccoUsedGrams', 0] } },
+    powderGrams: { $sum: { $ifNull: ['$powderUsedGrams', 0] } },
+    cuts: { $sum: { $ifNull: ['$cuts', 0] } },
+    boxes: {
+      $sum: {
+        $cond: [
+          { $gt: [{ $ifNull: ['$boxes', 0] }, 0] },
+          '$boxes',
+          { $divide: [{ $ifNull: ['$cuts', 0] }, 300] }
+        ]
+      }
+    },
+    beedis: { $sum: { $ifNull: ['$beedis', 0] } }
+  };
+  const rangeStart = new Date(Math.min(weekStart.getTime(), monthStart.getTime()));
+  const [periodTotals, totalResult] = await Promise.all([
+    Export.aggregate([
+      { $match: { date: { $gte: rangeStart } } },
+      { $facet: {
+        today: [{ $match: { date: { $gte: minTodayStart } } }, { $group: { _id: null, ...exportTotals } }],
+        week: [{ $match: { date: { $gte: weekStart } } }, { $group: { _id: null, ...exportTotals } }],
+        month: [{ $match: { date: { $gte: monthStart } } }, { $group: { _id: null, ...exportTotals } }]
+      } }
+    ]),
+    Export.aggregate([{ $group: { _id: null, ...exportTotals } }])
   ]);
 
-  function sumConsumed(prods) {
-    const tGrams = prods.reduce((s, p) => s + (p.tobaccoUsedGrams || 0), 0);
-    const pGrams = prods.reduce((s, p) => s + (p.powderUsedGrams || 0), 0);
-    const cuts = prods.reduce((s, p) => s + (p.cuts || 0), 0);
-    const boxes = prods.reduce((s, p) => s + (p.boxes !== undefined && p.boxes !== null && p.boxes > 0 ? p.boxes : ((p.cuts || 0) / 300)), 0);
+  function formatConsumed(row = {}) {
+    const tGrams = row.tobaccoGrams || 0;
+    const pGrams = row.powderGrams || 0;
+    const cuts = row.cuts || 0;
+    const boxes = row.boxes || 0;
     return {
       tobaccoKg: Number((tGrams / 1000).toFixed(2)),
       tobaccoGrams: tGrams,
@@ -46,9 +71,12 @@ async function getStockSummary() {
       powderGrams: pGrams,
       boxes: Number(boxes.toFixed(1)),
       cuts,
-      beedis: prods.reduce((s, p) => s + (p.beedis || 0), 0)
+      beedis: row.beedis || 0
     };
   }
+
+  const totals = periodTotals[0] || {};
+  const allTime = totalResult[0] || {};
 
   return {
     tobacco: {
@@ -64,10 +92,10 @@ async function getStockSummary() {
       lastUpdated: powderStock.lastUpdated
     },
     consumption: {
-      today: sumConsumed(prodsToday),
-      week: sumConsumed(prodsWeek),
-      month: sumConsumed(prodsMonth),
-      total: sumConsumed(allProds)
+      today: formatConsumed(totals.today[0]),
+      week: formatConsumed(totals.week[0]),
+      month: formatConsumed(totals.month[0]),
+      total: formatConsumed(allTime)
     },
     lowStockThresholdKg: thresholdKg
   };
@@ -92,7 +120,7 @@ async function recalculateStockLedger(item = null) {
       if (m.type === 'initial') return 1;
       if (m.type === 'added') return 2;
       if (m.type === 'adjustment' && m.quantityGrams > 0) return 3;
-      if (m.type === 'production_usage') return 4;
+      if (m.type === 'production_usage' || m.type === 'export_usage') return 4;
       return 5;
     };
 
@@ -127,19 +155,19 @@ async function recalculateStockLedger(item = null) {
   }
 }
 
-async function recordStockUsage(tobaccoUsedGrams, powderUsedGrams, productionId = null, notes = '', productionDate = null) {
+async function recordStockUsage(tobaccoUsedGrams, powderUsedGrams, referenceId = null, notes = '', usageDate = null, usageType = 'export_usage') {
   const tobaccoDeduct = Math.round(Number(tobaccoUsedGrams) || 0);
   const powderDeduct = Math.round(Number(powderUsedGrams) || 0);
-  const movementDate = productionDate ? new Date(productionDate) : new Date();
+  const movementDate = usageDate ? new Date(usageDate) : new Date();
 
   if (tobaccoDeduct > 0) {
     await StockMovement.create({
       item: 'tobacco',
-      type: 'production_usage',
+      type: usageType,
       quantityGrams: -tobaccoDeduct,
       balanceAfterGrams: 0, // Will be set strictly by recalculateStockLedger
-      referenceId: productionId,
-      notes: notes || `Production consumed: ${tobaccoDeduct}g Tobacco`,
+      referenceId,
+      notes: notes || `Export consumed: ${tobaccoDeduct}g Tobacco`,
       date: movementDate
     });
   }
@@ -147,10 +175,10 @@ async function recordStockUsage(tobaccoUsedGrams, powderUsedGrams, productionId 
   if (powderDeduct > 0) {
     await StockMovement.create({
       item: 'powder',
-      type: 'production_usage',
+      type: usageType,
       quantityGrams: -powderDeduct,
       balanceAfterGrams: 0, // Will be set strictly by recalculateStockLedger
-      referenceId: productionId,
+      referenceId,
       notes: notes || `Production consumed: ${powderDeduct}g Powder (தூள்)`,
       date: movementDate
     });
@@ -282,37 +310,64 @@ async function editStockMovement(movementId, { quantityKg, notes, date }) {
   return { success: true, movement: refreshedMovement || movement, stock };
 }
 
-async function getRecentMovements(limit = null) {
-  const movements = await StockMovement.find().populate('referenceId');
-
-  const typePriority = (m) => {
-    if (m.type === 'initial') return 1;
-    if (m.type === 'added') return 2;
-    if (m.type === 'adjustment' && m.quantityGrams > 0) return 3;
-    if (m.type === 'production_usage') return 4;
-    return 5;
-  };
-
-  // Descending sort for the ledger display: newest date on top
-  // For same date: usages display on top of additions, with additions below (chronological bottom-to-top flow)
-  movements.sort((a, b) => {
-    const dateA = (a.date ? new Date(a.date) : new Date(a.createdAt)).toISOString().slice(0, 10);
-    const dateB = (b.date ? new Date(b.date) : new Date(b.createdAt)).toISOString().slice(0, 10);
-    if (dateA !== dateB) return dateB.localeCompare(dateA);
-
-    const pA = typePriority(a);
-    const pB = typePriority(b);
-    if (pA !== pB) return pB - pA;
-
-    const timeA = new Date(a.createdAt || a.date).getTime();
-    const timeB = new Date(b.createdAt || b.date).getTime();
-    return timeB - timeA;
-  });
-
-  if (limit && Number.isFinite(limit) && limit > 0) {
-    return movements.slice(0, limit);
+async function getPagedMovements({ item, from, to, page = 1, limit = 10 } = {}) {
+  const filter = {};
+  if (item && item !== 'all') filter.item = item;
+  if (from || to) {
+    filter.date = {};
+    if (from) filter.date.$gte = new Date(`${from}T00:00:00.000Z`);
+    if (to) filter.date.$lte = new Date(`${to}T23:59:59.999Z`);
   }
-  return movements;
+
+  const pageSize = Math.max(1, Math.min(200, parseInt(limit, 10) || 10));
+  const currentPage = Math.max(1, parseInt(page, 10) || 1);
+  const offset = (currentPage - 1) * pageSize;
+  const [total, rows] = await Promise.all([
+    StockMovement.countDocuments(filter),
+    StockMovement.aggregate([
+      { $match: filter },
+      {
+        $addFields: {
+          _sortDate: {
+            $dateToString: {
+              format: '%Y-%m-%d',
+              date: { $ifNull: ['$date', '$createdAt'] },
+              timezone: 'UTC'
+            }
+          },
+          _typePriority: {
+            $switch: {
+              branches: [
+                { case: { $eq: ['$type', 'initial'] }, then: 1 },
+                { case: { $eq: ['$type', 'added'] }, then: 2 },
+                { case: { $and: [{ $eq: ['$type', 'adjustment'] }, { $gt: ['$quantityGrams', 0] }] }, then: 3 },
+                { case: { $in: ['$type', ['production_usage', 'export_usage']] }, then: 4 }
+              ],
+              default: 5
+            }
+          }
+        }
+      },
+      { $sort: { _sortDate: -1, _typePriority: -1, createdAt: -1 } },
+      { $skip: offset },
+      { $limit: pageSize },
+      { $project: { _sortDate: 0, _typePriority: 0 } }
+    ])
+  ]);
+  const movements = await StockMovement.populate(rows, { path: 'referenceId' });
+
+  return {
+    total,
+    totalPages: Math.max(1, Math.ceil(total / pageSize)),
+    currentPage,
+    pageSize,
+    movements
+  };
+}
+
+async function getRecentMovements(limit = 10) {
+  const result = await getPagedMovements({ page: 1, limit });
+  return result.movements;
 }
 
 async function getStockReport(params = {}) {
@@ -471,7 +526,7 @@ async function getStockReport(params = {}) {
         runningTobaccoBal = (mov.balanceAfterGrams !== undefined && mov.balanceAfterGrams !== null) ? mov.balanceAfterGrams : (runningTobaccoBal + qty);
         if (mov.type === 'added' || (mov.type === 'initial' && qty > 0)) {
           mTobaccoAdded += qty;
-        } else if (mov.type === 'production_usage') {
+        } else if (mov.type === 'production_usage' || mov.type === 'export_usage') {
           mTobaccoUsed += Math.abs(qty);
         } else if (mov.type === 'wastage') {
           mTobaccoWastage += Math.abs(qty);
@@ -482,7 +537,7 @@ async function getStockReport(params = {}) {
         runningPowderBal = (mov.balanceAfterGrams !== undefined && mov.balanceAfterGrams !== null) ? mov.balanceAfterGrams : (runningPowderBal + qty);
         if (mov.type === 'added' || (mov.type === 'initial' && qty > 0)) {
           mPowderAdded += qty;
-        } else if (mov.type === 'production_usage') {
+        } else if (mov.type === 'production_usage' || mov.type === 'export_usage') {
           mPowderUsed += Math.abs(qty);
         } else if (mov.type === 'wastage') {
           mPowderWastage += Math.abs(qty);
@@ -956,6 +1011,7 @@ async function getMonthlyStockReport(monthStr) {
 
 module.exports = {
   getStockSummary,
+  getPagedMovements,
   recalculateStockLedger,
   recordStockUsage,
   addStock,

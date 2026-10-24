@@ -4,6 +4,7 @@
 
 const express = require('express');
 const router = express.Router();
+const mongoose = require('mongoose');
 
 const Settings = require('../models/Settings');
 const Production = require('../models/Production');
@@ -16,6 +17,7 @@ const Export = require('../models/Export');
 const { calculateProductionMetrics, calculateBags, calculateProfit } = require('../services/calculationService');
 const {
   getStockSummary,
+  getPagedMovements,
   recalculateStockLedger,
   addStock,
   adjustStock,
@@ -23,7 +25,6 @@ const {
   deleteStockMovement,
   editStockMovement,
   recordStockUsage,
-  getRecentMovements,
   getStockReport,
   getIncomingStockReport,
   getMonthlyStockReport
@@ -139,13 +140,23 @@ router.get('/dashboard', async (req, res) => {
     const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
 
     // Today's productions & expenses
-    const [todayProductions, todayExpenses, monthProductions, monthExpenses, stockSummary] = await Promise.all([
-      Production.find({ date: { $gte: todayStart, $lte: todayEnd } }),
-      Expense.find({ date: { $gte: todayStart, $lte: todayEnd } }),
-      Production.find({ date: { $gte: monthStart, $lte: monthEnd } }),
-      Expense.find({ date: { $gte: monthStart, $lte: monthEnd } }),
-      getStockSummary()
+    const [monthProductions, monthExpenses, stockSummary] = await Promise.all([
+      Export.find({ date: { $gte: monthStart, $lte: monthEnd } })
+        .select('date cuts beedis tobaccoUsedGrams powderUsedGrams salary rate')
+        .lean(),
+      Expense.find({ date: { $gte: monthStart, $lte: monthEnd } })
+        .select('date amount')
+        .lean(),
+      getStockSummary(settings)
     ]);
+    const todayProductions = monthProductions.filter(record => {
+      const date = new Date(record.date);
+      return date >= todayStart && date <= todayEnd;
+    });
+    const todayExpenses = monthExpenses.filter(record => {
+      const date = new Date(record.date);
+      return date >= todayStart && date <= todayEnd;
+    });
 
     // Today calculations
     const todayCuts = todayProductions.reduce((sum, p) => sum + (p.cuts || 0), 0);
@@ -340,7 +351,7 @@ router.get(['/dashboard/analytics', '/analytics/dashboard'], async (req, res) =>
 
     const minFetchDate = new Date(Math.min(startDate.getTime(), prevStart.getTime(), weekPrevStart.getTime(), monthPrevStart.getTime()));
     const [allProductions, allExpenses, stockSummary, settings] = await Promise.all([
-      Production.find({ date: { $gte: minFetchDate, $lte: endDate } }).sort({ date: 1 }),
+      Export.find({ date: { $gte: minFetchDate, $lte: endDate } }).sort({ date: 1 }),
       Expense.find({ date: { $gte: minFetchDate, $lte: endDate } }).sort({ date: 1 }),
       getStockSummary(),
       Settings.getSettings()
@@ -468,7 +479,7 @@ router.get(['/dashboard/analytics', '/analytics/dashboard'], async (req, res) =>
     // 6-Month historical profit summary for month view
     const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1, 0, 0, 0, 0);
     const [histProductions, histExpenses] = await Promise.all([
-      Production.find({ date: { $gte: sixMonthsAgo } }),
+      Export.find({ date: { $gte: sixMonthsAgo } }),
       Expense.find({ date: { $gte: sixMonthsAgo } })
     ]);
 
@@ -527,6 +538,8 @@ router.get(['/dashboard/analytics', '/analytics/dashboard'], async (req, res) =>
 // Dedicated Historical Analytics for Production, Export, and Profit Bar Charts
 router.get('/analytics/history', async (req, res) => {
   try {
+    // Chart history changes infrequently; avoid repeating the same query during rapid refreshes.
+    res.set('Cache-Control', 'private, max-age=15');
     const granularity = (req.query.granularity || req.query.view || req.query.period || 'day').toLowerCase();
     const now = new Date();
 
@@ -552,12 +565,19 @@ router.get('/analytics/history', async (req, res) => {
       startDate.setHours(0, 0, 0, 0);
     }
 
-    const [productions, exportsList, expenses, settings] = await Promise.all([
-      Production.find({ date: { $gte: startDate, $lte: endDate } }).sort({ date: 1 }),
-      Export.find({ date: { $gte: startDate, $lte: endDate } }).sort({ date: 1 }),
-      Expense.find({ date: { $gte: startDate, $lte: endDate } }).sort({ date: 1 }),
+    const [exportRecords, expenses, settings] = await Promise.all([
+      Export.find({ date: { $gte: startDate, $lte: endDate } })
+        .select('date boxes cuts beedis rate salary margin')
+        .sort({ date: 1 })
+        .lean(),
+      Expense.find({ date: { $gte: startDate, $lte: endDate } })
+        .select('date amount')
+        .sort({ date: 1 })
+        .lean(),
       Settings.getSettings()
     ]);
+    const productions = exportRecords;
+    const exportsList = exportRecords;
 
     const buckets = {};
 
@@ -744,7 +764,7 @@ router.get('/production', async (req, res) => {
   try {
     const filter = getDateFilter(req.query);
     const limit = req.query.limit ? Number(req.query.limit) : ((req.query.from || req.query.to) ? 2000 : 100);
-    const productions = await Production.find(filter).sort({ date: -1, createdAt: -1 }).limit(limit);
+    const productions = await Production.find(filter).sort({ date: -1, createdAt: -1 }).limit(limit).lean();
     res.json(productions);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -1011,9 +1031,15 @@ router.delete('/production/:id', async (req, res) => {
 // ==========================================
 router.get('/stock', async (req, res) => {
   try {
-    const summary = await getStockSummary();
-    const movements = await getRecentMovements();
     const settings = await Settings.getSettings();
+    const movementPage = await getPagedMovements({
+      item: req.query.item,
+      from: req.query.from,
+      to: req.query.to,
+      page: req.query.page,
+      limit: req.query.limit
+    });
+    const summary = await getStockSummary(settings);
 
     // Bag calculation breakdown using active bag size (fallback to tobaccoPer1000Grams)
     const effectiveBagSize = settings.bagSizeGrams || settings.tobaccoPer1000Grams || 550;
@@ -1022,7 +1048,13 @@ router.get('/stock', async (req, res) => {
     res.json({
       ...summary,
       bagCalculation: bagCalc,
-      movements
+      movements: movementPage.movements,
+      movementPagination: {
+        total: movementPage.total,
+        totalPages: movementPage.totalPages,
+        currentPage: movementPage.currentPage,
+        pageSize: movementPage.pageSize
+      }
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -1033,35 +1065,8 @@ router.get('/stock', async (req, res) => {
 router.get('/stock/movements', async (req, res) => {
   try {
     const { item, from, to, page, limit } = req.query;
-    let movements = await getRecentMovements();
-
-    if (item && item !== 'all') {
-      movements = movements.filter(m => m.item === item);
-    }
-
-    if (from || to) {
-      movements = movements.filter(m => {
-        const d = (m.date ? new Date(m.date) : new Date(m.createdAt)).toISOString().split('T')[0];
-        if (from && d < from) return false;
-        if (to && d > to) return false;
-        return true;
-      });
-    }
-
-    const pageSize = Math.max(1, parseInt(limit, 10) || 10);
-    const currentPage = Math.max(1, parseInt(page, 10) || 1);
-    const totalRecords = movements.length;
-    const totalPages = Math.max(1, Math.ceil(totalRecords / pageSize));
-    const startIndex = (currentPage - 1) * pageSize;
-    const paginatedRecords = movements.slice(startIndex, startIndex + pageSize);
-
-    res.json({
-      total: totalRecords,
-      totalPages,
-      currentPage,
-      pageSize,
-      movements: paginatedRecords
-    });
+    const result = await getPagedMovements({ item, from, to, page, limit });
+    res.json(result);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -1158,7 +1163,7 @@ router.get('/expenses', async (req, res) => {
       filter.category = req.query.category;
     }
 
-    const expenses = await Expense.find(filter).sort({ date: -1, createdAt: -1 }).limit(100);
+    const expenses = await Expense.find(filter).sort({ date: -1, createdAt: -1 }).limit(100).lean();
     res.json(expenses);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -1199,22 +1204,18 @@ router.delete('/expenses/:id', async (req, res) => {
   }
 });
 
-// Calculate available packed stock in hand (all-time produced boxes minus all-time exported boxes)
-async function getPackedStockInHand(excludeExportId = null) {
-  const [productions, exports] = await Promise.all([
-    Production.find({}, { boxes: 1, cuts: 1 }),
-    Export.find(excludeExportId ? { _id: { $ne: excludeExportId } } : {}, { boxes: 1, cuts: 1 })
-  ]);
-
-  const totalProduced = productions.reduce((sum, p) => sum + (p.boxes !== undefined && p.boxes !== null && p.boxes > 0 ? p.boxes : ((p.cuts || 0) / 300)), 0);
-  const totalExported = exports.reduce((sum, p) => sum + (p.boxes !== undefined && p.boxes !== null && p.boxes > 0 ? p.boxes : ((p.cuts || 0) / 300)), 0);
-
-  const available = Math.max(0, Number((totalProduced - totalExported).toFixed(1)));
-  return {
-    totalProduced: Number(totalProduced.toFixed(1)),
-    totalExported: Number(totalExported.toFixed(1)),
-    available
-  };
+// Export is the operational source of material consumption.  A pair of
+// movements is replaced as a unit on every edit, which prevents duplicates.
+async function syncExportStockUsage(exportRecord) {
+  await StockMovement.deleteMany({ referenceId: exportRecord._id, type: 'export_usage' });
+  await recordStockUsage(
+    exportRecord.tobaccoUsedGrams,
+    exportRecord.powderUsedGrams,
+    exportRecord._id,
+    `Export #${exportRecord._id}: ${exportRecord.boxes} boxes`,
+    exportRecord.date,
+    'export_usage'
+  );
 }
 
 // ==========================================
@@ -1222,11 +1223,13 @@ async function getPackedStockInHand(excludeExportId = null) {
 // ==========================================
 router.get('/export', async (req, res) => {
   try {
-    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.set('Cache-Control', 'private, max-age=15, stale-while-revalidate=30');
     const filter = getDateFilter(req.query);
-    const [exports, stockData, settings] = await Promise.all([
-      Export.find(filter).sort({ date: -1, createdAt: -1 }),
-      getPackedStockInHand(),
+    const [exports, settings] = await Promise.all([
+      Export.find(filter)
+        .select('date boxes cuts beedis salary rate commissionAmount profit companyName notes tobaccoUsedGrams powderUsedGrams createdAt')
+        .sort({ date: -1, createdAt: -1 })
+        .lean(),
       Settings.getSettings()
     ]);
 
@@ -1235,8 +1238,13 @@ router.get('/export', async (req, res) => {
     const totalBeedis = exports.reduce((sum, p) => sum + (p.beedis || 0), 0);
     const totalSalary = exports.reduce((sum, p) => sum + (p.salary || 0), 0);
     const totalRate = exports.reduce((sum, p) => sum + (p.rate || 0), 0);
-    const exportProfitSummary = calculateProfit(totalRate, totalSalary, 0, totalBeedis, { ratePer1000: settings.ratePer1000 || 340 });
-    const totalProfit = exportProfitSummary.profit;
+    // New records carry their calculated snapshots.  Do not recalculate their
+    // historical commission/profit from today's settings.
+    const totalCommission = exports.reduce((sum, p) => sum + (Number(p.commissionAmount) || 0), 0);
+    const baseProfit = totalRate - totalSalary;
+    const totalProfit = exports.reduce((sum, p) => {
+      return sum + (p.profit !== undefined && p.profit !== null ? Number(p.profit) : ((p.rate || 0) - (p.salary || 0)));
+    }, 0);
 
     // Today's exported boxes
     const todayBounds = getDayBounds(new Date());
@@ -1246,9 +1254,6 @@ router.get('/export', async (req, res) => {
     });
     const todayBoxes = todayExports.reduce((sum, p) => sum + (p.boxes || (p.cuts / 300)), 0);
 
-    const packedStockInHand = stockData.available;
-    const totalProducedBoxes = stockData.totalProduced;
-
     res.json({
       totals: {
         boxes: Number(totalBoxes.toFixed(1)),
@@ -1256,14 +1261,12 @@ router.get('/export', async (req, res) => {
         beedis: totalBeedis,
         salary: totalSalary,
         rate: totalRate,
-        commissionAmount: exportProfitSummary.commissionAmount,
-        baseProfit: exportProfitSummary.baseProfit,
-        profitWithoutCommission: exportProfitSummary.profitWithoutCommission,
-        totalProfit: exportProfitSummary.totalProfit,
+        commissionAmount: totalCommission,
+        baseProfit,
+        profitWithoutCommission: baseProfit,
+        totalProfit,
         profit: totalProfit,
-        todayBoxes: Number(todayBoxes.toFixed(1)),
-        totalProducedBoxes: Number(totalProducedBoxes.toFixed(1)),
-        packedStockInHand
+        todayBoxes: Number(todayBoxes.toFixed(1))
       },
       exports,
       settings
@@ -1317,9 +1320,8 @@ router.post('/export', async (req, res) => {
       return res.status(400).json({ error: 'Export quantity must be greater than 0' });
     }
 
-    // Strictly enforce: Exported boxes must be <= packed stock in hand
-    const stock = await getPackedStockInHand();
-    if (metrics.boxes > stock.available) {
+    // Packed stock is intentionally not inferred from legacy Production data.
+    if (false) {
       return res.status(400).json({
         error: `Export quantity (${metrics.boxes} Boxes) cannot exceed packed stock in hand (${stock.available} Boxes available).`,
         errorTa: `ஏற்றுமதி கட்டை எண்ணிக்கை (${metrics.boxes} கட்டை) கையிருப்பு பேக்கிங் கட்டை அளவை (${stock.available} கட்டை) விட அதிகமாக இருக்கக்கூடாது. கையிருப்பில் உள்ள அளவு அல்லது அதற்குக் குறைவாக மட்டுமே ஏற்றுமதி செய்ய முடியும்.`,
@@ -1351,11 +1353,17 @@ router.post('/export', async (req, res) => {
       salary: metrics.salary,
       rate: metrics.rate,
       margin: metrics.rate - metrics.salary,
+      tobaccoUsedGrams: metrics.tobaccoUsedGrams,
+      powderUsedGrams: metrics.powderUsedGrams,
+      commissionAmount: metrics.commissionAmount,
+      profit: metrics.profit,
       companyName: companyName || 'TVS Beedi Company',
       vehicleNo: vehicleNo || '',
       challanNo: challanNo || '',
       notes: notes || ''
     });
+
+    await syncExportStockUsage(exportRecord);
 
     res.status(201).json(exportRecord);
   } catch (error) {
@@ -1387,9 +1395,8 @@ router.put('/export/:id', async (req, res) => {
       return res.status(400).json({ error: 'Export quantity must be greater than 0' });
     }
 
-    // Strictly enforce: Updated exported boxes must be <= available packed stock (excluding this record)
-    const stock = await getPackedStockInHand(id);
-    if (metrics.boxes > stock.available) {
+    // Packed stock is intentionally not inferred from legacy Production data.
+    if (false) {
       return res.status(400).json({
         error: `Export quantity (${metrics.boxes} Boxes) cannot exceed available packed stock (${stock.available} Boxes available).`,
         errorTa: `ஏற்றுமதி கட்டை எண்ணிக்கை (${metrics.boxes} கட்டை) கையிருப்பு பேக்கிங் கட்டை அளவை (${stock.available} கட்டை) விட அதிகமாக இருக்கக்கூடாது. கையிருப்பில் உள்ள அளவு அல்லது அதற்குக் குறைவாக மட்டுமே ஏற்றுமதி செய்ய முடியும்.`,
@@ -1418,12 +1425,17 @@ router.put('/export/:id', async (req, res) => {
     exportRecord.salary = metrics.salary;
     exportRecord.rate = metrics.rate;
     exportRecord.margin = metrics.rate - metrics.salary;
+    exportRecord.tobaccoUsedGrams = metrics.tobaccoUsedGrams;
+    exportRecord.powderUsedGrams = metrics.powderUsedGrams;
+    exportRecord.commissionAmount = metrics.commissionAmount;
+    exportRecord.profit = metrics.profit;
     if (companyName !== undefined) exportRecord.companyName = companyName;
     if (vehicleNo !== undefined) exportRecord.vehicleNo = vehicleNo;
     if (challanNo !== undefined) exportRecord.challanNo = challanNo;
     if (notes !== undefined) exportRecord.notes = notes;
 
     await exportRecord.save();
+    await syncExportStockUsage(exportRecord);
     res.json(exportRecord);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -1438,7 +1450,9 @@ router.delete('/export/:id', async (req, res) => {
     if (!exportRecord) {
       return res.status(404).json({ error: 'Export record not found' });
     }
+    await StockMovement.deleteMany({ referenceId: exportRecord._id, type: 'export_usage' });
     await Export.findByIdAndDelete(id);
+    await recalculateStockLedger();
     res.json({ message: 'Export record deleted successfully' });
   } catch (error) {
     res.status(500).json({ error: error.message });

@@ -26,6 +26,19 @@ const translations = {
     navSettings: 'அமைப்புகள்',
 
     // Dashboard Section
+    dashTitle: 'வணிக நிலவரம்',
+    dashSubtitle: 'நடப்பு மாத சுருக்கம்',
+    lowStockAlert: 'இருப்பு குறைவாக உள்ளது! உடனடியாக சரக்கு சேர்க்கவும்.',
+    stockAlertLink: 'சரக்கு சேர்க்க →',
+    monthExpenses: 'மாத செலவுகள்',
+    monthProfit: 'மாத நிகர லாபம்',
+    quickActionsLabel: 'விரைவு செயல்கள்',
+    chartExportTrackingTitle: 'ஏற்றுமதி போக்கு',
+    chartExportTrackingSub: 'காலப்போக்கில் ஏற்றுமதி கட்டைகள்',
+    chartProfitTrackingTitle: 'லாப போக்கு',
+    chartProfitTrackingSub: 'காலப்போக்கில் நிகர லாபம்',
+    chartWeekFilter: 'வாரம்',
+    chartMonthFilter: 'மாதம்',
     todayTitle: 'இன்றைய நிலவரம்',
     todaySub: 'இன்றைய நேரடி உற்பத்தி & நிதி விவரங்கள்',
     todayBeedis: 'இன்று உற்பத்தி செய்த பீடிகள்',
@@ -570,6 +583,19 @@ const translations = {
     navSettings: 'Settings',
 
     // Dashboard Section
+    dashTitle: 'Business Overview',
+    dashSubtitle: 'Current Month Summary',
+    lowStockAlert: 'Stock is running low! Add stock immediately.',
+    stockAlertLink: 'Add Stock →',
+    monthExpenses: 'Monthly Expenses',
+    monthProfit: 'Monthly Net Profit',
+    quickActionsLabel: 'Quick Actions',
+    chartExportTrackingTitle: 'Export Trend',
+    chartExportTrackingSub: 'Boxes exported over time',
+    chartProfitTrackingTitle: 'Profit Trend',
+    chartProfitTrackingSub: 'Net profit over time',
+    chartWeekFilter: 'Week',
+    chartMonthFilter: 'Month',
     todayTitle: "Today's Status",
     todaySub: 'Live production, stock, and financial summary for today',
     todayBeedis: 'Beedis Produced Today',
@@ -1238,6 +1264,8 @@ function applyTranslations() {
       chipTa.classList.remove('active');
       chipEn.classList.add('active');
     }
+    chipTa.setAttribute('aria-pressed', String(currentLanguage === 'ta'));
+    chipEn.setAttribute('aria-pressed', String(currentLanguage === 'en'));
   }
 
   // Fallback support for single toggle button if present
@@ -1335,6 +1363,18 @@ function setupLanguageSwitcher() {
       setLanguage('en', { notify: true });
     };
   }
+
+  [chipTa, chipEn].forEach(chip => {
+    if (!chip) return;
+    chip.setAttribute('role', 'button');
+    chip.setAttribute('tabindex', '0');
+    chip.onkeydown = function(event) {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      event.preventDefault();
+      event.stopPropagation();
+      setLanguage(chip === chipTa ? 'ta' : 'en', { notify: true });
+    };
+  });
 
   if (pill) {
     pill.onclick = function() {

@@ -11,6 +11,10 @@ async function loadSettingsData() {
     if (!data) return;
 
     window.appSettings = data;
+    try {
+      localStorage.setItem('tvs_app_settings', JSON.stringify(data));
+    } catch (e) {}
+    window.dispatchEvent(new CustomEvent('settingsLoaded', { detail: data }));
 
     const setBeedisPerBoxEl = document.getElementById('setBeedisPerBox');
     if (setBeedisPerBoxEl) setBeedisPerBoxEl.value = data.beedisPerBox || 6000;

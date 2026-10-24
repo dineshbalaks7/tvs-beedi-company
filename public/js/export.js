@@ -4,6 +4,9 @@
  */
 
 let cachedExports = null;
+// Keep the initial complete result for summary controls even when the history
+// table is later narrowed to a date range.
+let allExportRecords = null;
 let exportFilterMode = 'all';
 let currentDuplicateExportRecord = null;
 let includeExportCommission = true;
@@ -36,7 +39,7 @@ function selectExportSummaryDay(offset) {
 function getSummaryMonthOptions() {
   const currentYear = new Date().getFullYear();
   const years = new Set([currentYear]);
-  (cachedExports?.exports || []).forEach(record => {
+  (allExportRecords || cachedExports?.exports || []).forEach(record => {
     const date = new Date(record.date);
     if (!Number.isNaN(date.getTime())) years.add(date.getFullYear());
   });
@@ -131,14 +134,37 @@ function applyExportSummarySelection() {
   const { from, to } = getSummarySelectionRange();
   if (!from || !to) return;
 
-  const url = `/api/export?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&_=${Date.now()}`;
-  fetch(url, { cache: 'no-store' })
-    .then(response => {
-      if (!response.ok) throw new Error('Failed to load export summary');
-      return response.json();
-    })
-    .then(data => renderExportUI(data, true))
-    .catch(error => console.error('Error loading export summary:', error));
+  const source = allExportRecords || cachedExports?.exports;
+  if (!source) return;
+
+  // The initial Export response already includes every record used by the
+  // summary. Filter and total it locally instead of issuing another API call.
+  const exportsForRange = source.filter(record => {
+    const date = getExportRecordISODate(record.date);
+    return date >= from && date <= to;
+  });
+  const totals = exportsForRange.reduce((summary, record) => {
+    const boxes = Number(record.boxes || ((record.cuts || 0) / (window.appSettings?.cutsPerBox || 300)));
+    const rate = Number(record.rate || 0);
+    const salary = Number(record.salary || 0);
+    const commission = Number(record.commissionAmount || 0);
+    summary.boxes += boxes;
+    summary.cuts += Number(record.cuts || 0);
+    summary.beedis += Number(record.beedis || 0);
+    summary.salary += salary;
+    summary.rate += rate;
+    summary.commissionAmount += commission;
+    summary.baseProfit += rate - salary;
+    summary.totalProfit += record.profit !== undefined && record.profit !== null
+      ? Number(record.profit)
+      : rate - salary;
+    return summary;
+  }, { boxes: 0, cuts: 0, beedis: 0, salary: 0, rate: 0, commissionAmount: 0, baseProfit: 0, totalProfit: 0 });
+
+  totals.boxes = Number(totals.boxes.toFixed(1));
+  totals.profit = totals.totalProfit;
+  totals.profitWithoutCommission = totals.baseProfit;
+  renderExportUI({ exports: exportsForRange, totals }, true);
 }
 
 function setExportSummaryFilter(period, button) {
@@ -181,9 +207,9 @@ function getExportProfitMetrics(record, includeCommission = includeExportCommiss
   const salary = Number(record.salary || 0);
   const beedis = Number(record.beedis || 0);
   const profitWithoutCommission = rate - salary;
-  const commissionAmount = includeCommission
-    ? (beedis * (window.appSettings?.commissionPercent ?? 0.10) / 1000) * (window.appSettings?.ratePer1000 || 340)
-    : 0;
+  const storedCommission = record.commissionAmount;
+  const calculatedCommission = (beedis * (window.appSettings?.commissionPercent ?? 0.10) / 1000) * (window.appSettings?.ratePer1000 || 340);
+  const commissionAmount = includeCommission ? (storedCommission !== undefined && storedCommission !== null ? Number(storedCommission) : calculatedCommission) : 0;
   return {
     profitWithoutCommission,
     commissionAmount,
@@ -231,6 +257,10 @@ function applyCustomExportDateFilter() {
 }
 
 function getAvailableStockForExport() {
+  // There is no packed-stock calculation without a production workflow.
+  // Material availability is tracked through the Stock ledger after saving.
+  return Infinity;
+
   const baseStock = (cachedExports && cachedExports.totals && typeof cachedExports.totals.packedStockInHand === 'number')
     ? cachedExports.totals.packedStockInHand
     : 0;
@@ -253,6 +283,8 @@ function handleExportBoxesInput(val) {
   const cutsPerBox = window.appSettings?.cutsPerBox || 300;
   const salaryPer1000 = window.appSettings?.salaryPer1000 || 320;
   const ratePer1000 = window.appSettings?.ratePer1000 || 340;
+  const tobaccoPer1000 = window.appSettings?.tobaccoPer1000Grams || 600;
+  const powderPer1000 = window.appSettings?.powderPer1000Grams || 200;
 
   const cuts = Math.round(boxes * cutsPerBox);
   const beedis = Math.round(boxes * beedisPerBox);
@@ -261,6 +293,8 @@ function handleExportBoxesInput(val) {
   const profitWithoutCommission = rate - salary;
   const commission = includeExportCommission ? (beedis * (window.appSettings?.commissionPercent ?? 0.10) / 1000) * ratePer1000 : 0;
   const totalProfit = profitWithoutCommission + commission;
+  const tobaccoKg = (beedis / 1000) * tobaccoPer1000 / 1000;
+  const powderKg = (beedis / 1000) * powderPer1000 / 1000;
 
   const elBoxes = document.getElementById('prevExpBoxes');
   if (elBoxes) elBoxes.textContent = formatNumber(boxes);
@@ -268,6 +302,10 @@ function handleExportBoxesInput(val) {
   if (elCuts) elCuts.textContent = formatNumber(cuts);
   const elBeedis = document.getElementById('prevExpBeedis');
   if (elBeedis) elBeedis.textContent = formatNumber(beedis);
+  const elTobacco = document.getElementById('prevExpTobacco');
+  if (elTobacco) elTobacco.textContent = `${formatNumber(tobaccoKg)} kg`;
+  const elPowder = document.getElementById('prevExpPowder');
+  if (elPowder) elPowder.textContent = `${formatNumber(powderKg)} kg`;
   const elRate = document.getElementById('prevExpRate');
   if (elRate) elRate.textContent = formatINR(rate);
   const elSalary = document.getElementById('prevExpSalary');
@@ -291,8 +329,8 @@ function handleExportBoxesInput(val) {
     if (exceededEl) {
       exceededEl.style.display = 'block';
       exceededEl.textContent = isEn
-        ? `⚠️ Cannot exceed packed stock in hand (${available} Boxes available)!`
-        : `⚠️ ஏற்றுமதி அளவு கையிருப்பை விட அதிகமாக உள்ளது! (கையிருப்பு: ${available} கட்டை மட்டுமே உள்ளது)`;
+        ? `Cannot exceed packed stock in hand (${available} Boxes available)!`
+        : `ஏற்றுமதி அளவு கையிருப்பை விட அதிகமாக உள்ளது! (கையிருப்பு: ${available} கட்டை மட்டுமே உள்ளது)`;
     }
     if (submitBtn) {
       submitBtn.disabled = true;
@@ -413,15 +451,15 @@ async function startEditExport(id) {
 
   const isEn = (typeof currentLanguage !== 'undefined' && currentLanguage === 'en');
   if (submitText) submitText.textContent = isEn ? 'Update Export Record' : 'ஏற்றுமதி பதிவை மாற்று';
-  if (submitIcon) submitIcon.textContent = '✏️';
+  if (submitIcon) submitIcon.innerHTML = '<path d="m4 16-.8 4.8L8 20l10.5-10.5-4-4L4 16Z"/><path d="m13 7 4 4"/>';
   if (cancelBtn) cancelBtn.style.display = 'inline-flex';
 
   if (editBadge) {
     editBadge.style.display = 'flex';
     if (editModeText) {
       editModeText.textContent = isEn
-        ? `✏️ Editing Export for ${formatDate(record.date)} (${record.boxes} Boxes)`
-        : `✏️ ${formatDate(record.date)} தேதிக்கான ஏற்றுமதி திருத்தம் (${record.boxes} கட்டை)`;
+        ? `Editing Export for ${formatDate(record.date)} (${record.boxes} Boxes)`
+        : `${formatDate(record.date)} தேதிக்கான ஏற்றுமதி திருத்தம் (${record.boxes} கட்டை)`;
     }
   }
 
@@ -467,7 +505,7 @@ function cancelEditExport() {
 
   const isEn = (typeof currentLanguage !== 'undefined' && currentLanguage === 'en');
   if (submitText) submitText.textContent = isEn ? 'Save Export Record' : 'ஏற்றுமதியைச் சேமிக்கவும்';
-  if (submitIcon) submitIcon.textContent = '🚚';
+  if (submitIcon) submitIcon.innerHTML = '<path d="M3 6h11v11H3zM14 10h4l3 3v4h-7z"/><circle cx="7" cy="19" r="2"/><circle cx="18" cy="19" r="2"/>';
   if (cancelBtn) cancelBtn.style.display = 'none';
   if (editBadge) editBadge.style.display = 'none';
 
@@ -537,7 +575,7 @@ async function handleExportSubmit(event) {
 
     showToast(isEditing ? 'Export updated successfully' : 'Export saved successfully', 'success');
     cancelEditExport();
-    loadExportData();
+    loadExportData('', '', true);
   } catch (err) {
     showToast(err.message, 'error');
   }
@@ -646,8 +684,8 @@ function renderExportUI(data, summaryOnly = false) {
           <td><span style="color: var(--text-main); font-weight: 500;">${p.companyName || 'TVS Beedi Company'}</span></td>
           <td>
             <div class="table-actions-cell">
-              <button class="btn-secondary btn-table-action" onclick="startEditExport('${p._id}')" title="Edit">✏️</button>
-              <button class="btn-danger btn-table-action" onclick="deleteExport('${p._id}')" title="Delete">✕</button>
+              <button class="btn-secondary btn-table-action" onclick="startEditExport('${p._id}')" title="Edit"><svg class="export-action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m4 16-.8 4.8L8 20l10.5-10.5-4-4L4 16Z"/><path d="m13 7 4 4"/></svg></button>
+              <button class="btn-danger btn-table-action" onclick="deleteExport('${p._id}')" title="Delete"><svg class="export-action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
             </div>
           </td>
         </tr>
@@ -658,7 +696,7 @@ function renderExportUI(data, summaryOnly = false) {
   }
 }
 
-async function loadExportData(from = '', to = '') {
+async function loadExportData(from = '', to = '', forceRefresh = false) {
   try {
     let url = '/api/export';
     const params = new URLSearchParams();
@@ -666,11 +704,15 @@ async function loadExportData(from = '', to = '') {
     if (to) params.append('to', to);
     if (params.toString()) url += '?' + params.toString();
 
-    const res = await fetch(`${url}${url.includes('?') ? '&' : '?'}_=${Date.now()}`, { cache: 'no-store' });
+    const requestUrl = forceRefresh
+      ? `${url}${url.includes('?') ? '&' : '?'}_=${Date.now()}`
+      : url;
+    const res = await fetch(requestUrl, { cache: forceRefresh ? 'no-store' : 'default' });
     const data = await res.json();
     if (!data || !data.totals) return;
 
     cachedExports = data;
+    if (!from && !to) allExportRecords = data.exports || [];
     renderExportUI(data);
     renderExportBarChart(currentExportChartGranularity);
     applyExportSummarySelection();
@@ -1001,6 +1043,41 @@ function generateExportPDFHTML(data) {
   `;
 }
 
+let exportPdfLibrariesPromise = null;
+
+function loadExportPdfScript(src, ready) {
+  if (ready()) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const existing = document.querySelector(`script[data-export-pdf-src="${src}"]`);
+    if (existing) {
+      existing.addEventListener('load', resolve, { once: true });
+      existing.addEventListener('error', () => reject(new Error(`Unable to load ${src}`)), { once: true });
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = src;
+    script.async = true;
+    script.dataset.exportPdfSrc = src;
+    script.onload = resolve;
+    script.onerror = () => reject(new Error(`Unable to load ${src}`));
+    document.head.appendChild(script);
+  });
+}
+
+function ensureExportPdfLibraries() {
+  if (typeof window.html2canvas !== 'undefined' && window.jspdf?.jsPDF) return Promise.resolve();
+  if (!exportPdfLibrariesPromise) {
+    exportPdfLibrariesPromise = Promise.all([
+      loadExportPdfScript('/js/html2canvas.min.js', () => typeof window.html2canvas !== 'undefined'),
+      loadExportPdfScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js', () => Boolean(window.jspdf?.jsPDF))
+    ]).catch(error => {
+      exportPdfLibrariesPromise = null;
+      throw error;
+    });
+  }
+  return exportPdfLibrariesPromise;
+}
+
 async function downloadExportPDF() {
   const fromInput = document.getElementById('exportFromDate');
   const toInput = document.getElementById('exportToDate');
@@ -1014,7 +1091,18 @@ async function downloadExportPDF() {
     return;
   }
 
-  // Check libraries
+  const pdfButton = document.getElementById('btnDownloadExportPDF');
+  if (pdfButton) { pdfButton.disabled = true; pdfButton.style.opacity = '0.7'; }
+  try {
+    await ensureExportPdfLibraries();
+  } catch (error) {
+    console.error('Export PDF library load failed:', error);
+    showToast(isEn ? 'PDF tools could not be loaded. Please try again.' : 'PDF கருவிகள் ஏற்றப்படவில்லை. மீண்டும் முயற்சிக்கவும்.', 'error');
+    if (pdfButton) { pdfButton.disabled = false; pdfButton.style.opacity = '1'; }
+    return;
+  }
+
+  // Check libraries after the deferred loader completes.
   if (typeof html2canvas === 'undefined') {
     showToast(isEn ? 'Canvas library not loaded.' : 'Canvas நூலகம் ஏற்றப்படவில்லை.', 'error');
     console.error('html2canvas library is not loaded.');

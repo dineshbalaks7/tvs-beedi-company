@@ -36,6 +36,12 @@ const ExportSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
+  // Values are snapshots calculated at save time so later settings changes do
+  // not alter the financial or material history of an export.
+  tobaccoUsedGrams: { type: Number, default: 0, min: 0 },
+  powderUsedGrams: { type: Number, default: 0, min: 0 },
+  commissionAmount: { type: Number, default: 0 },
+  profit: { type: Number, default: 0 },
   companyName: {
     type: String,
     default: 'TVS Beedi Company'

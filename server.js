@@ -32,9 +32,12 @@ const MONGODB_LOG_TARGET = (() => {
   }
 })();
 const ADMIN_USERNAME = process.env.ADMIN_USERNAME || 'admin';
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
-const SESSION_SECRET = process.env.SESSION_SECRET || 'change-this-session-secret';
-const SESSION_IDLE_TIMEOUT_MS = 30 * 60 * 1000;
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
+const SESSION_SECRET = process.env.SESSION_SECRET;
+if (!ADMIN_PASSWORD || !SESSION_SECRET) {
+  throw new Error('ADMIN_PASSWORD and SESSION_SECRET must be set in the environment.');
+}
+const SESSION_IDLE_TIMEOUT_MS = 2 * 24 * 60 * 60 * 1000;
 
 function hashPassword(password, salt = crypto.randomBytes(16).toString('hex')) {
   return new Promise((resolve, reject) => {
@@ -59,6 +62,12 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Public assets do not need a Mongo-backed session lookup on every request.
+const publicDirectory = path.join(__dirname, 'public');
+for (const directory of ['css', 'js', 'images']) {
+  app.use(`/${directory}`, express.static(path.join(publicDirectory, directory), { maxAge: '1h' }));
+}
+
 // Session Store with error handling
 const sessionStore = MongoStore.create({
   mongoUrl: MONGODB_URI,
@@ -72,8 +81,8 @@ app.use(session({
   secret: SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
-  // Renew the session cookie only when the browser makes a request. With no
-  // client activity, the cookie and MongoDB session expire after 30 minutes.
+  // Renew the session cookie on activity. With no activity, the cookie and
+  // MongoDB session expire after two days.
   rolling: true,
   store: sessionStore,
   cookie: {
@@ -96,6 +105,13 @@ async function ensureDatabaseInitialized() {
   return databaseInitializationPromise;
 }
 
+// Start connecting while the serverless module is being loaded so the first
+// request can await an in-flight connection instead of starting from zero.
+if (process.env.VERCEL) {
+  databaseInitializationPromise = ensureDatabaseInitialized();
+  databaseInitializationPromise.catch(() => {});
+}
+
 // Ensure database connection is established before processing API / auth requests
 app.use(async (req, res, next) => {
   if (req.path.startsWith('/css/') || req.path.startsWith('/js/') || req.path.startsWith('/images/') || req.path === '/favicon.ico') {
@@ -114,6 +130,17 @@ app.use(async (req, res, next) => {
     }
     next(error);
   }
+});
+
+// Opt-in request timing for local performance checks.
+app.use('/api', (req, res, next) => {
+  if (process.env.PERF_LOG !== 'true') return next();
+  const startedAt = process.hrtime.bigint();
+  res.on('finish', () => {
+    const durationMs = Number(process.hrtime.bigint() - startedAt) / 1e6;
+    console.log(`[PERF] ${req.method} ${req.path} ${res.statusCode} ${durationMs.toFixed(1)}ms`);
+  });
+  next();
 });
 
 function requireAuth(req, res, next) {
@@ -147,7 +174,7 @@ app.post('/api/auth/login', async (req, res) => {
       if (settings.adminPasswordHash) {
         passwordMatches = await verifyPassword(password || '', settings.adminPasswordHash, settings.adminPasswordSalt);
       }
-      if (!passwordMatches && (password === ADMIN_PASSWORD || password === 'admin123')) {
+      if (!passwordMatches && password === ADMIN_PASSWORD) {
         passwordMatches = true;
       }
     }
@@ -263,6 +290,16 @@ app.use((req, res, next) => {
   return next();
 });
 
+// Production is retired as an operational screen.  This middleware runs
+// before the public static middleware so an authenticated user cannot bypass
+// the page routes by requesting production.html directly.
+app.use((req, res, next) => {
+  if (req.path === '/production' || req.path === '/production.html' || req.path === '/js/production.js' || req.path === '/css/production.css') {
+    return res.status(404).sendFile(path.join(__dirname, 'public', '404.html'));
+  }
+  return next();
+});
+
 app.use(express.static(path.join(__dirname, 'public'), {
   index: false,
   setHeaders: (res, filePath) => {
@@ -281,7 +318,6 @@ app.use('/api', requireAuth, apiRoutes);
 app.get('/login', (req, res) => res.sendFile(path.join(__dirname, 'public', 'login.html')));
 app.get('/', requireAuth, (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 app.get('/dashboard', requireAuth, (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
-app.get('/production', requireAuth, (req, res) => res.sendFile(path.join(__dirname, 'public', 'production.html')));
 app.get('/stock', requireAuth, (req, res) => res.sendFile(path.join(__dirname, 'public', 'stock.html')));
 app.get('/expenses', requireAuth, (req, res) => res.sendFile(path.join(__dirname, 'public', 'expenses.html')));
 app.get('/export', requireAuth, (req, res) => res.sendFile(path.join(__dirname, 'public', 'export.html')));

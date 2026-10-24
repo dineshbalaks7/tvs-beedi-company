@@ -1,1349 +1,440 @@
 /**
- * TVS Beedi Company - Dashboard Specific Logic
- * Period Switching, Number Differences, Comparative Growth, Charts & CSV Export
+ * TVS Beedi Company — Dashboard JavaScript (Simplified)
+ * Loads from 2 endpoints: /api/dashboard (KPIs) + /api/analytics/history (charts).
+ * No period switching, no comparison card, no weekly/monthly/daily overview cards.
  */
 
-let currentDashboardPeriod = 'day';
-let currentComparisonPeriod = 'day';
-let cachedAnalytics = null;
-let dashProdChartInstance = null;
-let dashExportChartInstance = null;
-let dashProfitChartInstance = null;
-let dashProdGranularity = 'day';
-let dashExportGranularity = 'day';
-let dashProfitGranularity = 'day';
-let dashboardRequestId = 0;
-const dashboardChartHistoryCache = {};
-const dashboardOverviewHistoryCache = {};
+'use strict';
 
-function getCalendarDate(value) {
-  if (typeof value === 'string') {
-    const match = value.match(/^(\d{4})-(\d{2})(?:-(\d{2}))?/);
-    if (match) return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3] || 1));
-  }
-  return new Date(value);
+// ── State ────────────────────────────────────────────────────────────────────
+let exportChartInstance = null;
+let profitChartInstance = null;
+let exportChartGranularity = 'month';
+let profitChartGranularity = 'month';
+const chartHistoryCache = {}; // keyed by granularity
+const chartHistoryPromises = {}; // keyed by granularity, prevents duplicate in-flight requests
+
+// ── KPI Element IDs ──────────────────────────────────────────────────────────
+const KPI_ELEMENT_IDS = {
+  tobaccoValue: 'dashKpiTobacco',
+  tobaccoSub: 'dashKpiTobaccoSub',
+  powderValue: 'dashKpiPowder',
+  powderSub: 'dashKpiPowderSub',
+  expensesValue: 'dashKpiExpenses',
+  expensesSub: 'dashKpiExpensesSub',
+  profitValue: 'dashKpiProfit',
+  profitSub: 'dashKpiProfitSub'
+};
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  updateDateBadge();
+  window.setTimeout(hideDashboardSplash, 2000);
+  loadDashboard();
+  // Refresh settings label once settings are applied by common.js
+  window.addEventListener('settingsLoaded', updateDateBadge);
+  window.addEventListener('languageChanged', updateDateBadge);
+});
+
+function hideDashboardSplash() {
+  const splash = document.getElementById('dashboardSplash');
+  if (!splash) return;
+  splash.classList.add('is-hidden');
+  window.setTimeout(() => splash.remove(), 350);
 }
 
-function getWeekBucket(value) {
-  const date = getCalendarDate(value);
-  const day = date.getDay();
-  const monday = new Date(date);
-  monday.setDate(date.getDate() - day + (day === 0 ? -6 : 1));
-  monday.setHours(0, 0, 0, 0);
-  return monday;
-}
-
-function setDashboardPeriod(period) {
-  if (period !== 'day' && period !== 'week' && period !== 'month') return;
-  currentDashboardPeriod = period;
-  currentComparisonPeriod = period;
-  updateDashboardPeriodPills();
-  updateComparisonFilterButtons();
-  loadDashboardAnalytics(period);
-}
-
-function setComparisonPeriod(period) {
-  if (period !== 'day' && period !== 'week' && period !== 'month') return;
-  currentComparisonPeriod = period;
-  updateComparisonFilterButtons();
-  if (cachedAnalytics) {
-    renderPeriodComparisonCard(cachedAnalytics, currentComparisonPeriod);
-  }
-}
-
-function updateComparisonFilterButtons() {
-  const btnDay = document.getElementById('compFilterDay');
-  const btnWeek = document.getElementById('compFilterWeek');
-  const btnMonth = document.getElementById('compFilterMonth');
-  [btnDay, btnWeek, btnMonth].forEach(b => b && b.classList.remove('active'));
-  if (currentComparisonPeriod === 'day' && btnDay) btnDay.classList.add('active');
-  if (currentComparisonPeriod === 'week' && btnWeek) btnWeek.classList.add('active');
-  if (currentComparisonPeriod === 'month' && btnMonth) btnMonth.classList.add('active');
-}
-
-function setDashboardLoading(isLoading) {
-  const view = document.getElementById('view-dashboard');
-  if (!view) return;
-  view.classList.toggle('dashboard-loading', isLoading);
-  view.setAttribute('aria-busy', String(isLoading));
-}
-
-function getProfitMetrics(summary) {
-  const rate = Number(summary?.rate || 0);
-  const salary = Number(summary?.salary || 0);
-  const expenses = Number(summary?.expenses || 0);
-  const beedis = Number(summary?.beedis || 0);
-  const commissionPercent = Number(window.appSettings?.commissionPercent ?? 0.10);
-  const ratePer1000 = Number(window.appSettings?.ratePer1000 ?? 340);
-  const commissionAmount = Number(summary?.commissionAmount ?? ((beedis * commissionPercent) / 1000 * ratePer1000));
-  const profitWithoutCommission = Number(summary?.profitWithoutCommission ?? (rate - salary - expenses));
-  const totalProfit = Number(summary?.totalProfit ?? (profitWithoutCommission + commissionAmount));
-  return { profitWithoutCommission, commissionAmount, totalProfit };
-}
-
-function updateDashboardRatios() {
+// ── Date Badge ───────────────────────────────────────────────────────────────
+function updateDateBadge() {
+  const el = document.getElementById('dashDateBadge');
+  if (!el) return;
+  const now = new Date();
   const isEn = (typeof currentLanguage !== 'undefined' && currentLanguage === 'en');
-  const beedisPerBox = window.appSettings?.beedisPerBox || 6000;
-  const tobaccoPer1000 = window.appSettings?.tobaccoPer1000Grams || 600;
-  const powderPer1000 = window.appSettings?.powderPer1000Grams || 200;
-
-  const beedisRatioEl = document.getElementById('dashTodayBeedisRatio');
-  if (beedisRatioEl) {
-    beedisRatioEl.textContent = isEn
-      ? `1 Box = ${formatNumber(beedisPerBox)} Beedis`
-      : `1 கட்டை = ${formatNumber(beedisPerBox)} பீடிகள்`;
-  }
-
-  const tobaccoRatioEl = document.getElementById('dashTodayTobaccoRatio');
-  if (tobaccoRatioEl) {
-    tobaccoRatioEl.textContent = isEn
-      ? `${tobaccoPer1000}g / 1,000 Beedis`
-      : `${tobaccoPer1000}g / 1,000 பீடி`;
-  }
-
-  const powderRatioEl = document.getElementById('dashTodayPowderRatio');
-  if (powderRatioEl) {
-    powderRatioEl.textContent = isEn
-      ? `${powderPer1000}g / 1,000 Beedis`
-      : `${powderPer1000}g / 1,000 பீடி`;
-  }
+  const month = now.toLocaleDateString(isEn ? 'en-US' : 'ta-IN', { month: 'long', year: 'numeric' });
+  el.textContent = month;
 }
 
-function updateDashboardPeriodPills() {
-  updateDashboardRatios();
-  const isEn = (typeof currentLanguage !== 'undefined' && currentLanguage === 'en');
-  const btnDay = document.getElementById('btnPeriodDay');
-  const btnWeek = document.getElementById('btnPeriodWeek');
-  const btnMonth = document.getElementById('btnPeriodMonth');
-  const badgeText = document.getElementById('dashPeriodBadgeText');
-  const mainTitle = document.getElementById('dashMainTitle');
-  const mainSubtitle = document.getElementById('dashMainSubtitle');
-  const labels = {
-    boxes: document.getElementById('metricLabelBoxes'),
-    beedis: document.getElementById('metricLabelBeedis'),
-    tobacco: document.getElementById('metricLabelTobacco'),
-    powder: document.getElementById('metricLabelPowder'),
-    rate: document.getElementById('metricLabelRate'),
-    expenses: document.getElementById('metricLabelExpenses'),
-    baseProfit: document.getElementById('metricLabelBaseProfit'),
-    commission: document.getElementById('metricLabelCommission'),
-    profit: document.getElementById('metricLabelProfit'),
-    formula: document.getElementById('dashProfitFormulaTitle')
-  };
-  const setLabel = (name, text) => {
-    if (labels[name]) labels[name].textContent = text;
-  };
-
-  [btnDay, btnWeek, btnMonth].forEach(b => b && b.classList.remove('active'));
-
-  if (currentDashboardPeriod === 'day') {
-    if (btnDay) btnDay.classList.add('active');
-    if (badgeText) badgeText.textContent = isEn ? 'Live: Day-wise' : 'நேரடி: இன்று';
-    if (mainTitle) mainTitle.textContent = isEn ? "Today's Business Live" : 'இன்றைய நிலவரம்';
-    if (mainSubtitle) mainSubtitle.textContent = isEn ? "Live production & financial breakdown for today" : 'இன்றைய நேரடி உற்பத்தி & நிதி விவரங்கள்';
-    setLabel('boxes', isEn ? 'Today Boxes' : 'இன்று கட்டை (Boxes)');
-    setLabel('beedis', isEn ? 'Today Beedis' : 'இன்று பீடிகள்');
-    setLabel('tobacco', isEn ? 'Tobacco Used Today' : 'இன்று Tobacco பயன்பாடு');
-    setLabel('powder', isEn ? 'Powder Used Today' : 'இன்று தூள் பயன்பாடு');
-    setLabel('rate', isEn ? "Today's Rate Value" : 'இன்றைய Rate மதிப்பு');
-    setLabel('expenses', isEn ? "Today's Expenses" : 'இன்றைய செலவுகள்');
-    setLabel('baseProfit', isEn ? 'Net Profit (No Commission)' : 'நிகர லாபம் (கமிஷன் இல்லை)');
-    setLabel('commission', isEn ? "Today's Commission" : 'இன்றைய கமிஷன்');
-    setLabel('profit', isEn ? "Today's Net Profit" : 'இன்றைய நிகர லாபம்');
-    setLabel('formula', isEn ? "Today's Net Profit (Profit)" : 'இன்றைய நிகர லாபம் (Profit)');
-  } else if (currentDashboardPeriod === 'week') {
-    if (btnWeek) btnWeek.classList.add('active');
-    if (badgeText) badgeText.textContent = isEn ? 'Weekly: 7 Days' : 'வாராந்திர: 7 நாட்கள்';
-    if (mainTitle) mainTitle.textContent = isEn ? "Weekly Performance (7 Days)" : 'இந்த வார நிலவரம் (7 நாட்கள்)';
-    if (mainSubtitle) mainSubtitle.textContent = isEn ? "Summary across the current 7-day period" : 'இந்த வார உற்பத்தி, Rate, கூலி & லாப நிலவரம்';
-    setLabel('boxes', isEn ? 'This Week Boxes' : 'இந்த வார கட்டை (Boxes)');
-    setLabel('beedis', isEn ? 'Beedis Produced This Week' : 'இந்த வாரம் தயாரித்த பீடிகள்');
-    setLabel('tobacco', isEn ? 'Tobacco Used This Week' : 'இந்த வார Tobacco பயன்பாடு');
-    setLabel('powder', isEn ? 'Powder Used This Week' : 'இந்த வார தூள் பயன்பாடு');
-    setLabel('rate', isEn ? 'This Week Rate Value' : 'இந்த வார Rate மதிப்பு');
-    setLabel('expenses', isEn ? 'This Week Expenses' : 'இந்த வார செலவுகள்');
-    setLabel('baseProfit', isEn ? 'Weekly Net Profit (No Commission)' : 'வார நிகர லாபம் (கமிஷன் இல்லை)');
-    setLabel('commission', isEn ? 'This Week Commission' : 'இந்த வார கமிஷன்');
-    setLabel('profit', isEn ? 'This Week Net Profit' : 'இந்த வார நிகர லாபம்');
-    setLabel('formula', isEn ? 'Weekly Net Profit (Profit)' : 'இந்த வார நிகர லாபம் (Profit)');
-  } else if (currentDashboardPeriod === 'month') {
-    if (btnMonth) btnMonth.classList.add('active');
-    if (badgeText) badgeText.textContent = isEn ? 'Monthly: Current Month' : 'மாதாந்திர: நடப்பு மாதம்';
-    if (mainTitle) mainTitle.textContent = isEn ? "Monthly Performance Overview" : 'இந்த மாத நிலவரம்';
-    if (mainSubtitle) mainSubtitle.textContent = isEn ? "Comprehensive overview for the entire current month" : 'இந்த மாத முழுமையான உற்பத்தி & நிதி நிலவரம்';
-    setLabel('boxes', isEn ? 'This Month Boxes' : 'இந்த மாத கட்டை (Boxes)');
-    setLabel('beedis', isEn ? 'Beedis Produced This Month' : 'இந்த மாதம் தயாரித்த பீடிகள்');
-    setLabel('tobacco', isEn ? 'Tobacco Used This Month' : 'இந்த மாத Tobacco பயன்பாடு');
-    setLabel('powder', isEn ? 'Powder Used This Month' : 'இந்த மாத தூள் பயன்பாடு');
-    setLabel('rate', isEn ? 'This Month Rate Value' : 'இந்த மாத Rate மதிப்பு');
-    setLabel('expenses', isEn ? 'This Month Expenses' : 'இந்த மாத செலவுகள்');
-    setLabel('baseProfit', isEn ? 'Monthly Net Profit (No Commission)' : 'மாத நிகர லாபம் (கமிஷன் இல்லை)');
-    setLabel('commission', isEn ? 'This Month Commission' : 'இந்த மாத கமிஷன்');
-    setLabel('profit', isEn ? 'This Month Net Profit' : 'இந்த மாத நிகர லாபம்');
-    setLabel('formula', isEn ? 'Monthly Net Profit (Profit)' : 'இந்த மாத நிகர லாபம் (Profit)');
-  }
+// ── Show KPI Loading Spinners ─────────────────────────────────────────────────
+function showKpiLoadingSpinners() {
+  Object.values(KPI_ELEMENT_IDS).forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.classList.remove('is-loaded');
+      el.classList.add('loading-spinner');
+      // Fade the sub text while loading
+      const card = el.closest('.dash-kpi-card');
+      if (card) card.classList.add('is-loading');
+    }
+  });
 }
 
-async function loadDashboardAnalytics(period = 'day') {
-  const requestId = ++dashboardRequestId;
-  setDashboardLoading(true);
+// ── Hide KPI Loading Spinners & Restore Default Text ─────────────────────────
+function hideKpiLoadingSpinners() {
+  Object.values(KPI_ELEMENT_IDS).forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.classList.remove('loading-spinner');
+      el.classList.add('is-loaded');
+      // Remove loading state from parent card
+      const card = el.closest('.dash-kpi-card');
+      if (card) card.classList.remove('is-loading');
+    }
+  });
+}
+
+// ── Primary Data Load ─────────────────────────────────────────────────────────
+async function loadDashboard() {
+  // Show loading spinners on KPI value elements
+  showKpiLoadingSpinners();
+
   try {
-    const res = await fetch(`/api/dashboard/analytics?period=${period}`);
-    if (!res.ok) throw new Error('Failed to load dashboard data');
+    const res = await fetch('/api/dashboard');
+    if (!res.ok) throw new Error('Dashboard data unavailable');
     const data = await res.json();
-    if (requestId !== dashboardRequestId || period !== currentDashboardPeriod) return;
-    if (data && data.settings) {
+
+    // Persist settings to local cache (same pattern as common.js)
+    if (data.settings) {
       window.appSettings = { ...window.appSettings, ...data.settings };
-      try {
-        localStorage.setItem('tvs_app_settings', JSON.stringify(window.appSettings));
-      } catch (e) {}
-      updateDashboardRatios();
+      try { localStorage.setItem('tvs_app_settings', JSON.stringify(window.appSettings)); } catch (_) {}
     }
-    cachedAnalytics = data;
-    renderDashboardUI(data);
-    await renderDashboardCharts(data);
-    loadDashboardOverviewHistory('week');
-    loadDashboardOverviewHistory('month');
+
+    renderKPICards(data);
+    renderStockAlert(data.stock);
   } catch (err) {
-    console.error('Error loading dashboard analytics:', err);
-    showToast('Failed to load dashboard data', 'error');
+    console.error('[Dashboard] KPI load error:', err);
+    showToast('Dashboard data unavailable', 'error');
   } finally {
-    if (requestId === dashboardRequestId) setDashboardLoading(false);
+    hideKpiLoadingSpinners();
+    hideDashboardSplash();
   }
+
+  // Charts load independently — failure does not block KPI display
+  await Promise.all([
+    loadChartHistory(exportChartGranularity).then(data => renderExportChart(data, exportChartGranularity)),
+    loadChartHistory(profitChartGranularity).then(data => renderProfitChart(data, profitChartGranularity))
+  ]);
 }
 
-async function loadDashboardChartHistory(granularity) {
-  if (!dashboardChartHistoryCache[granularity]) {
-    dashboardChartHistoryCache[granularity] = fetch(`/api/analytics/history?granularity=${granularity}`)
-      .then(res => {
-        if (!res.ok) throw new Error('Failed to load chart history');
-        return res.json();
-      })
-      .catch(err => {
-        console.error(`Error loading ${granularity} chart history:`, err);
-        return { series: [] };
-      });
-  }
-  return dashboardChartHistoryCache[granularity];
-}
-
-function overviewMonthKey(value) {
-  return String(value || '').slice(0, 7);
-}
-
-function overviewMonthLabel(monthKey, isEn) {
-  const [year, month] = monthKey.split('-').map(Number);
-  if (!year || !month) return monthKey;
-  return new Date(year, month - 1, 1).toLocaleDateString(isEn ? 'en-US' : 'ta-IN', { month: 'long', year: 'numeric' });
-}
-
-function overviewSummaryFromHistory(row) {
-  return {
-    boxes: Number(row.prodBoxes ?? row.boxes ?? 0),
-    cuts: Number(row.prodCuts ?? row.cuts ?? 0),
-    beedis: Number(row.prodBeedis ?? row.beedis ?? 0),
-    rate: Number(row.prodRate ?? row.rate ?? 0),
-    salary: Number(row.prodSalary ?? row.salary ?? 0),
-    expenses: Number(row.expenses ?? 0),
-    profitWithoutCommission: row.profitWithoutCommission,
-    commissionAmount: row.commissionAmount,
-    totalProfit: row.totalProfit,
-    profit: row.totalProfit ?? row.profit ?? 0
-  };
-}
-
-function renderOverviewDifferences(prefix, summary, previousSummary) {
-  const metrics = getProfitMetrics(summary);
-  const previousMetrics = previousSummary ? getProfitMetrics(previousSummary) : null;
-  const values = {
-    Rate: [summary.rate, previousSummary?.rate],
-    Salary: [summary.salary, previousSummary?.salary],
-    Expenses: [summary.expenses, previousSummary?.expenses],
-    BaseProfit: [metrics.profitWithoutCommission, previousMetrics?.profitWithoutCommission],
-    Commission: [metrics.commissionAmount, previousMetrics?.commissionAmount],
-    TotalProfit: [metrics.totalProfit, previousMetrics?.totalProfit]
-  };
-
-  Object.entries(values).forEach(([metric, [current, previous]]) => {
-    const valueEl = document.getElementById(`dash${prefix}${metric}`);
-    if (!valueEl) return;
-    let differenceEl = document.getElementById(`dash${prefix}${metric}Growth`);
-    if (!differenceEl) {
-      differenceEl = document.createElement('div');
-      differenceEl.id = `dash${prefix}${metric}Growth`;
-      differenceEl.className = 'metric-sub overview-difference';
-      valueEl.insertAdjacentElement('afterend', differenceEl);
-    }
-    if (previous === undefined || previous === null) {
-      differenceEl.textContent = 'Δ —';
-      differenceEl.className = 'metric-sub overview-difference neutral';
-      return;
-    }
-    const difference = formatDeltaDisplay(Number(current || 0) - Number(previous || 0), 'currency');
-    differenceEl.textContent = `Δ ${difference.text}`;
-    differenceEl.className = `metric-sub overview-difference ${difference.cls}`;
-  });
-
-  const cutsValueEl = document.getElementById(`dash${prefix}Cuts`);
-  if (cutsValueEl) {
-    let cutsDifferenceEl = document.getElementById(`dash${prefix}CutsGrowth`);
-    if (!cutsDifferenceEl) {
-      cutsDifferenceEl = document.createElement('div');
-      cutsDifferenceEl.id = `dash${prefix}CutsGrowth`;
-      cutsDifferenceEl.className = 'metric-sub overview-difference';
-      cutsValueEl.insertAdjacentElement('afterend', cutsDifferenceEl);
-    }
-    if (!previousSummary) {
-      cutsDifferenceEl.textContent = 'Δ —';
-    } else {
-      const difference = formatDeltaDisplay(Number(summary.boxes || 0) - Number(previousSummary.boxes || 0), 'number', 'Boxes');
-      cutsDifferenceEl.textContent = `Δ ${difference.text}`;
-      cutsDifferenceEl.className = `metric-sub overview-difference ${difference.cls}`;
-    }
-  }
-}
-
-function renderOverviewSummary(prefix, summary, periodLabel, previousSummary = null) {
-  if (!summary) return;
-  const metrics = getProfitMetrics(summary);
+// ── KPI Rendering ─────────────────────────────────────────────────────────────
+function renderKPICards(data) {
   const isEn = (typeof currentLanguage !== 'undefined' && currentLanguage === 'en');
-  const boxesEl = document.getElementById(`dash${prefix}Cuts`);
-  if (boxesEl) boxesEl.innerHTML = `${formatNumber(summary.boxes)} <span class="metric-unit">${isEn ? 'Boxes' : 'கட்டை'}</span>`;
-  const beedisEl = document.getElementById(`dash${prefix}Beedis`);
-  if (beedisEl) beedisEl.textContent = `${formatNumber(summary.beedis)} ${isEn ? 'Pcs' : 'பீடிகள்'} (${formatNumber(summary.cuts)} Cuts)`;
-  const rateEl = document.getElementById(`dash${prefix}Rate`);
-  if (rateEl) rateEl.textContent = formatINR(summary.rate);
-  const salaryEl = document.getElementById(`dash${prefix}Salary`);
-  if (salaryEl) salaryEl.textContent = formatINR(summary.salary);
-  const expensesEl = document.getElementById(`dash${prefix}Expenses`);
-  if (expensesEl) expensesEl.textContent = formatINR(summary.expenses);
-  const profitEl = document.getElementById(`dash${prefix}Profit`);
+  const stock = data.stock || {};
+  const month = data.month || {};
+
+  // KPI 1: Tobacco Stock
+  const tobaccoEl = document.getElementById('dashKpiTobacco');
+  const tobaccoSubEl = document.getElementById('dashKpiTobaccoSub');
+  if (tobaccoEl) {
+    const kg = (stock.tobacco && stock.tobacco.kg !== undefined) ? stock.tobacco.kg : '—';
+    tobaccoEl.innerHTML = kg !== '—'
+      ? `${kg} <span style="font-size:14px;font-weight:600;color:var(--text-muted)">kg</span>`
+      : '—';
+    if (stock.tobacco && stock.tobacco.isLow) {
+      tobaccoEl.style.color = 'var(--accent-red)';
+    }
+  }
+  if (tobaccoSubEl) {
+    const consumed = stock.consumption?.today?.tobaccoKg ?? '—';
+    tobaccoSubEl.textContent = isEn
+      ? `Today used: ${consumed} kg`
+      : `இன்று பயன்பாடு: ${consumed} kg`;
+  }
+
+  // KPI 2: Powder Stock
+  const powderEl = document.getElementById('dashKpiPowder');
+  const powderSubEl = document.getElementById('dashKpiPowderSub');
+  if (powderEl) {
+    const kg = (stock.powder && stock.powder.kg !== undefined) ? stock.powder.kg : '—';
+    powderEl.innerHTML = kg !== '—'
+      ? `${kg} <span style="font-size:14px;font-weight:600;color:var(--text-muted)">kg</span>`
+      : '—';
+    if (stock.powder && stock.powder.isLow) {
+      powderEl.style.color = 'var(--accent-red)';
+    }
+  }
+  if (powderSubEl) {
+    const consumed = stock.consumption?.today?.powderKg ?? '—';
+    powderSubEl.textContent = isEn
+      ? `Today used: ${consumed} kg`
+      : `இன்று பயன்பாடு: ${consumed} kg`;
+  }
+
+  // KPI 3: Monthly Expenses
+  const expEl = document.getElementById('dashKpiExpenses');
+  if (expEl) {
+    expEl.textContent = formatINR(month.expenses || 0);
+    expEl.style.color = (month.expenses || 0) > 0 ? 'var(--accent-amber)' : 'var(--text-main)';
+  }
+  const expSubEl = document.getElementById('dashKpiExpensesSub');
+  if (expSubEl) {
+    expSubEl.textContent = isEn
+      ? `Rate: ${formatINR(month.rate || 0)}`
+      : `Rate: ${formatINR(month.rate || 0)}`;
+  }
+
+  // KPI 4: Monthly Net Profit
+  const profitEl = document.getElementById('dashKpiProfit');
+  const profitSubEl = document.getElementById('dashKpiProfitSub');
+  const totalProfit = month.totalProfit ?? month.profit ?? 0;
   if (profitEl) {
-    profitEl.textContent = formatINR(metrics.totalProfit);
-    profitEl.style.color = metrics.totalProfit >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
+    profitEl.textContent = formatINR(totalProfit);
+    profitEl.style.color = totalProfit >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
   }
-  const baseEl = document.getElementById(`dash${prefix}BaseProfit`);
-  if (baseEl) baseEl.textContent = formatINR(metrics.profitWithoutCommission);
-  const commissionEl = document.getElementById(`dash${prefix}Commission`);
-  if (commissionEl) commissionEl.textContent = formatINR(metrics.commissionAmount);
-  const totalEl = document.getElementById(`dash${prefix}TotalProfit`);
-  if (totalEl) {
-    totalEl.textContent = formatINR(metrics.totalProfit);
-    totalEl.style.color = metrics.totalProfit >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
-  }
-  const labelEl = document.getElementById(`dash${prefix}ProdLabel`);
-  if (labelEl && periodLabel) labelEl.textContent = periodLabel;
-  renderOverviewDifferences(prefix, summary, previousSummary);
-}
-
-function populateWeeklyOverviewFilters(series) {
-  const monthSelect = document.getElementById('dashWeekMonthFilter');
-  const weekSelect = document.getElementById('dashWeekFilter');
-  if (!monthSelect || !weekSelect || !series.length) return;
-  const isEn = (typeof currentLanguage !== 'undefined' && currentLanguage === 'en');
-  const monthKeys = [...new Set(series.map(row => overviewMonthKey(row.key)))].sort();
-  const selectedMonth = monthKeys.includes(monthSelect.value) ? monthSelect.value : monthKeys[monthKeys.length - 1];
-  monthSelect.innerHTML = monthKeys.map(key => `<option value="${key}">${overviewMonthLabel(key, isEn)}</option>`).join('');
-  monthSelect.value = selectedMonth;
-  filterWeeklyOverviewMonth(selectedMonth);
-}
-
-function filterWeeklyOverviewMonth(monthKey) {
-  const series = dashboardOverviewHistoryCache.week || [];
-  const weekSelect = document.getElementById('dashWeekFilter');
-  if (!weekSelect) return;
-  const monthRows = series.filter(row => overviewMonthKey(row.key) === monthKey);
-  const selectedWeek = monthRows.some(row => row.key === weekSelect.value) ? weekSelect.value : (monthRows[monthRows.length - 1]?.key || '');
-  const isEn = (typeof currentLanguage !== 'undefined' && currentLanguage === 'en');
-  weekSelect.innerHTML = monthRows.map((row, index) => `<option value="${row.key}">${isEn ? 'Week' : 'வாரம்'} ${index + 1} (${row.label})</option>`).join('');
-  weekSelect.value = selectedWeek;
-  filterWeeklyOverviewWeek(selectedWeek);
-}
-
-function filterWeeklyOverviewWeek(weekKey) {
-  const series = dashboardOverviewHistoryCache.week || [];
-  const rowIndex = series.findIndex(item => item.key === weekKey);
-  const row = rowIndex >= 0 ? series[rowIndex] : null;
-  if (!row) return;
-  const isEn = (typeof currentLanguage !== 'undefined' && currentLanguage === 'en');
-  const monthLabel = overviewMonthLabel(overviewMonthKey(row.key), isEn);
-  const weekSelect = document.getElementById('dashWeekFilter');
-  const weekIndex = weekSelect ? weekSelect.selectedIndex + 1 : 1;
-  const previousRow = rowIndex > 0 ? series[rowIndex - 1] : null;
-  renderOverviewSummary('Week', overviewSummaryFromHistory(row), `${isEn ? 'Week' : 'வாரம்'} ${weekIndex} - ${monthLabel}`, previousRow ? overviewSummaryFromHistory(previousRow) : null);
-}
-
-function filterMonthlyOverview(monthKey) {
-  const series = dashboardOverviewHistoryCache.month || [];
-  const rowIndex = series.findIndex(item => overviewMonthKey(item.key) === monthKey);
-  const row = rowIndex >= 0 ? series[rowIndex] : null;
-  if (!row) return;
-  const isEn = (typeof currentLanguage !== 'undefined' && currentLanguage === 'en');
-  const previousRow = rowIndex > 0 ? series[rowIndex - 1] : null;
-  renderOverviewSummary('Month', overviewSummaryFromHistory(row), `${isEn ? 'Month' : 'மாதம்'} - ${overviewMonthLabel(monthKey, isEn)}`, previousRow ? overviewSummaryFromHistory(previousRow) : null);
-}
-
-function populateMonthlyOverviewFilter(series) {
-  const select = document.getElementById('dashMonthFilter');
-  if (!select || !series.length) return;
-  const isEn = (typeof currentLanguage !== 'undefined' && currentLanguage === 'en');
-  const monthKeys = [...new Set(series.map(row => overviewMonthKey(row.key)))].sort();
-  const selectedMonth = monthKeys.includes(select.value) ? select.value : monthKeys[monthKeys.length - 1];
-  select.innerHTML = monthKeys.map(key => `<option value="${key}">${overviewMonthLabel(key, isEn)}</option>`).join('');
-  select.value = selectedMonth;
-  filterMonthlyOverview(selectedMonth);
-}
-
-function populateDailyOverviewFilter(series) {
-  const select = document.getElementById('dashDayFilter');
-  if (!select || !series.length) return;
-  const firstDay = series[0].key;
-  const lastDay = series[series.length - 1].key;
-  const selectedDay = series.some(row => row.key === select.value) ? select.value : lastDay;
-  select.min = firstDay;
-  select.max = lastDay;
-  select.value = selectedDay;
-  filterDailyOverview(selectedDay);
-}
-
-function filterDailyOverview(dayKey) {
-  const series = dashboardOverviewHistoryCache.day || [];
-  const rowIndex = series.findIndex(item => item.key === dayKey);
-  const row = rowIndex >= 0 ? series[rowIndex] : null;
-  if (!row) return;
-  const isEn = (typeof currentLanguage !== 'undefined' && currentLanguage === 'en');
-  const previousRow = rowIndex > 0 ? series[rowIndex - 1] : null;
-  renderOverviewSummary('Day', overviewSummaryFromHistory(row), `${isEn ? 'Daily' : 'தினசரி'} - ${row.label}`, previousRow ? overviewSummaryFromHistory(previousRow) : null);
-}
-
-async function loadDashboardOverviewHistory(granularity) {
-  if (!dashboardOverviewHistoryCache[granularity]) {
-    try {
-      const res = await fetch(`/api/analytics/history?granularity=${granularity}&limit=24`);
-      if (!res.ok) throw new Error('Failed to load overview history');
-      const data = await res.json();
-      dashboardOverviewHistoryCache[granularity] = data.series || [];
-      if (granularity === 'week') populateWeeklyOverviewFilters(dashboardOverviewHistoryCache.week);
-      if (granularity === 'month') populateMonthlyOverviewFilter(dashboardOverviewHistoryCache.month);
-      if (granularity === 'day') populateDailyOverviewFilter(dashboardOverviewHistoryCache.day);
-      loadDashboardOverviewHistory('day');
-    } catch (error) {
-      console.error(`Error loading ${granularity} overview history:`, error);
-    }
+  if (profitSubEl) {
+    const margin = month.profitMargin ?? 0;
+    profitSubEl.textContent = `Margin: ${Number(margin).toFixed(1)}%`;
+    profitSubEl.style.color = margin >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
   }
 }
 
-function renderDashboardUI(data) {
-  if (!data || !data.totals) return;
-  const isEn = (typeof currentLanguage !== 'undefined' && currentLanguage === 'en');
-  const todayProfitMetrics = getProfitMetrics(data.totals);
-
-  // 1. Primary Metrics
-  const dashTodayBoxes = document.getElementById('dashTodayBoxes');
-  if (dashTodayBoxes) {
-    dashTodayBoxes.innerHTML = `${formatNumber(data.totals.boxes)} <span class="metric-unit">${isEn ? 'Boxes' : 'கட்டை'}</span>`;
-  }
-  const dashTodayBoxesSub = document.getElementById('dashTodayBoxesSub');
-  if (dashTodayBoxesSub) {
-    dashTodayBoxesSub.textContent = `${formatNumber(data.totals.cuts)} ${isEn ? 'Cuts (300/Box)' : 'கட்டுகள் (300/Box)'}`;
-  }
-
-  const dashTodayBeedis = document.getElementById('dashTodayBeedis');
-  if (dashTodayBeedis) {
-    dashTodayBeedis.innerHTML = `${formatNumber(data.totals.beedis)} <span class="metric-unit">Pcs</span>`;
-  }
-
-  const dashTodayTobacco = document.getElementById('dashTodayTobacco');
-  if (dashTodayTobacco) {
-    dashTodayTobacco.innerHTML = `${data.totals.tobaccoUsedKg.toFixed(2)} <span class="metric-unit">kg</span>`;
-  }
-
-  const dashTodayPowder = document.getElementById('dashTodayPowder');
-  if (dashTodayPowder) {
-    dashTodayPowder.innerHTML = `${data.totals.powderUsedKg.toFixed(2)} <span class="metric-unit">kg</span>`;
-  }
-
-  const dashTodayRate = document.getElementById('dashTodayRate');
-  if (dashTodayRate) dashTodayRate.textContent = formatINR(data.totals.rate);
-
-  const dashTodaySalary = document.getElementById('dashTodaySalary');
-  if (dashTodaySalary) dashTodaySalary.textContent = formatINR(data.totals.salary);
-
-  const dashTodayExpenses = document.getElementById('dashTodayExpenses');
-  if (dashTodayExpenses) dashTodayExpenses.textContent = formatINR(data.totals.expenses);
-
-  const dashTodayExpCount = document.getElementById('dashTodayExpCount');
-  if (dashTodayExpCount) {
-    dashTodayExpCount.textContent = `${data.totals.expenseCount || 0} ${isEn ? 'expenses recorded' : 'செலவு பதிவுகள்'}`;
-  }
-
-  const dashTodayCommission = document.getElementById('dashTodayCommission');
-  if (dashTodayCommission) {
-    dashTodayCommission.textContent = formatINR(todayProfitMetrics.commissionAmount);
-    dashTodayCommission.style.color = todayProfitMetrics.commissionAmount >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
-  }
-
-  const dashTodayBaseProfit = document.getElementById('dashTodayBaseProfit');
-  if (dashTodayBaseProfit) {
-    dashTodayBaseProfit.textContent = formatINR(todayProfitMetrics.profitWithoutCommission);
-    dashTodayBaseProfit.style.color = todayProfitMetrics.profitWithoutCommission >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
-  }
-
-  const dashTodayProfit = document.getElementById('dashTodayProfit');
-  if (dashTodayProfit) {
-    dashTodayProfit.textContent = formatINR(todayProfitMetrics.totalProfit);
-    dashTodayProfit.style.color = todayProfitMetrics.totalProfit >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
-  }
-
-  const dashTodayMargin = document.getElementById('dashTodayMargin');
-  if (dashTodayMargin) {
-    dashTodayMargin.textContent = `Margin: ${data.totals.netMarginPercent || 0}%`;
-  }
-
-  // 2. Profit Transparency Banner
-  const dashCalcRate = document.getElementById('dashCalcRate');
-  if (dashCalcRate) dashCalcRate.textContent = formatINR(data.totals.rate);
-  const dashCalcSalary = document.getElementById('dashCalcSalary');
-  if (dashCalcSalary) dashCalcSalary.textContent = formatINR(data.totals.salary);
-  const dashCalcExpenses = document.getElementById('dashCalcExpenses');
-  if (dashCalcExpenses) dashCalcExpenses.textContent = formatINR(data.totals.expenses);
-  const dashCalcBaseProfit = document.getElementById('dashCalcBaseProfit');
-  if (dashCalcBaseProfit) dashCalcBaseProfit.textContent = formatINR(todayProfitMetrics.profitWithoutCommission);
-  const dashCalcCommission = document.getElementById('dashCalcCommission');
-  if (dashCalcCommission) dashCalcCommission.textContent = formatINR(todayProfitMetrics.commissionAmount);
-  const dashCalcProfit = document.getElementById('dashCalcProfit');
-  if (dashCalcProfit) {
-    dashCalcProfit.textContent = formatINR(todayProfitMetrics.totalProfit);
-    dashCalcProfit.style.color = todayProfitMetrics.totalProfit >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
-  }
-
-  // 3. Comparative Growth Formatting in Numbers
-  if (data.comparison && data.comparison.growth) {
-    const comp = data.comparison;
-    const g = comp.growth;
-    const periodLabel = isEn ? comp.labelEn : comp.labelTa;
-
-    const setBadge = (elId, deltaVal, type = 'number', unit = '', isInverse = false) => {
-      const el = document.getElementById(elId);
-      if (!el) return;
-      const d = formatDeltaDisplay(deltaVal, type, unit, isInverse);
-      el.className = `dash-metric-compare ${d.cls}`;
-      el.textContent = d.text;
-      el.setAttribute('title', `${d.text} vs ${periodLabel}`);
-    };
-
-    const deltaBoxes = g.deltaBoxes !== undefined ? g.deltaBoxes : g.boxesDelta;
-    const deltaBeedis = g.deltaBeedis !== undefined ? g.deltaBeedis : g.beedisDelta;
-    const deltaTobacco = g.deltaTobacco !== undefined ? g.deltaTobacco : g.tobaccoDelta;
-    const deltaPowder = g.deltaPowder !== undefined ? g.deltaPowder : g.powderDelta;
-    const deltaRate = g.deltaRate !== undefined ? g.deltaRate : g.rateDelta;
-    const deltaSalary = g.deltaSalary !== undefined ? g.deltaSalary : g.salaryDelta;
-    const deltaExpenses = g.deltaExpenses !== undefined ? g.deltaExpenses : g.expensesDelta;
-    const currentComparisonProfit = getProfitMetrics(comp.current);
-    const previousComparisonProfit = getProfitMetrics(comp.previous);
-    const deltaBaseProfit = currentComparisonProfit.profitWithoutCommission - previousComparisonProfit.profitWithoutCommission;
-    const deltaCommission = currentComparisonProfit.commissionAmount - previousComparisonProfit.commissionAmount;
-    const deltaProfit = currentComparisonProfit.totalProfit - previousComparisonProfit.totalProfit;
-
-    setBadge('compareBadgeBoxes', deltaBoxes, 'number', isEn ? 'Boxes' : 'கட்டை');
-    setBadge('compareBadgeBeedis', deltaBeedis, 'number', 'Pcs');
-    setBadge('compareBadgeTobacco', deltaTobacco, 'weight', 'kg', true);
-    setBadge('compareBadgePowder', deltaPowder, 'weight', 'kg', true);
-    setBadge('compareBadgeRate', deltaRate, 'currency');
-    setBadge('compareBadgeSalary', deltaSalary, 'currency');
-    setBadge('compareBadgeExpenses', deltaExpenses, 'currency', '', true);
-    setBadge('compareBadgeBaseProfit', deltaBaseProfit, 'currency');
-    setBadge('compareBadgeCommission', deltaCommission, 'currency');
-    setBadge('compareBadgeProfit', deltaProfit, 'currency');
-  }
-
-  // Render Period Comparison & Growth Analytics Card
-  updateComparisonFilterButtons();
-  renderPeriodComparisonCard(data, currentComparisonPeriod);
-
-  // 4. Stock Summary in Dashboard
-  if (data.stock) {
-    const elTob = document.getElementById('dashStockTobacco');
-    if (elTob) elTob.innerHTML = `${data.stock.tobacco?.kg || 0} <span class="metric-unit">kg</span>`;
-    const elTobCon = document.getElementById('dashStockTobaccoConsumed');
-    if (elTobCon) elTobCon.textContent = `${isEn ? 'Consumption' : 'பயன்பாடு'}: ${data.totals.tobaccoUsedKg.toFixed(1)} kg`;
-
-    const elPow = document.getElementById('dashStockPowder');
-    if (elPow) elPow.innerHTML = `${data.stock.powder?.kg || 0} <span class="metric-unit">kg</span>`;
-    const elPowCon = document.getElementById('dashStockPowderConsumed');
-    if (elPowCon) elPowCon.textContent = `${isEn ? 'Consumption' : 'பயன்பாடு'}: ${data.totals.powderUsedKg.toFixed(1)} kg`;
-
-    const alertBanner = document.getElementById('dashboardStockAlert');
-    if (alertBanner) {
-      if (data.stock.tobacco?.isLow || data.stock.powder?.isLow) {
-        alertBanner.style.display = 'flex';
+// ── Stock Alert ───────────────────────────────────────────────────────────────
+function renderStockAlert(stock) {
+  const banner = document.getElementById('dashboardStockAlert');
+  if (!banner || !stock) return;
+  const tobaccoLow = stock.tobacco?.isLow;
+  const powderLow = stock.powder?.isLow;
+  if (tobaccoLow || powderLow) {
+    banner.style.display = 'flex';
+    const isEn = (typeof currentLanguage !== 'undefined' && currentLanguage === 'en');
+    const alertTextEl = document.getElementById('stockAlertText');
+    if (alertTextEl) {
+      if (tobaccoLow && powderLow) {
+        alertTextEl.textContent = isEn
+          ? 'Tobacco and powder stock are running low. Add stock immediately.'
+          : 'Tobacco மற்றும் தூள் இருப்பு குறைவாக உள்ளது! உடனடியாக சரக்கு சேர்க்கவும்.';
+      } else if (tobaccoLow) {
+        alertTextEl.textContent = isEn
+          ? `Tobacco stock is low (${stock.tobacco.kg} kg). Add stock immediately.`
+          : `Tobacco இருப்பு குறைவாக உள்ளது (${stock.tobacco.kg} kg)! உடனடியாக சேர்க்கவும்.`;
       } else {
-        alertBanner.style.display = 'none';
+        alertTextEl.textContent = isEn
+          ? `Powder stock is low (${stock.powder.kg} kg). Add stock immediately.`
+          : `தூள் இருப்பு குறைவாக உள்ளது (${stock.powder.kg} kg)! உடனடியாக சேர்க்கவும்.`;
       }
     }
-  }
-
-  // 5. Weekly & Monthly Dedicated Cards
-  const weekData = data.weekComparison;
-  if (weekData && weekData.current) {
-    const wc = weekData.current;
-    const wg = weekData.growth;
-    const weekProfitMetrics = getProfitMetrics(wc);
-    const elWeekCuts = document.getElementById('dashWeekCuts');
-    if (elWeekCuts) elWeekCuts.innerHTML = `${formatNumber(wc.boxes)} <span class="metric-unit">${isEn ? 'Boxes' : 'கட்டை'}</span>`;
-    const elWeekBeedis = document.getElementById('dashWeekBeedis');
-    if (elWeekBeedis) elWeekBeedis.textContent = `${formatNumber(wc.beedis)} Pcs (${formatNumber(wc.cuts)} Cuts)`;
-
-    const elWeekRate = document.getElementById('dashWeekRate');
-    if (elWeekRate) elWeekRate.textContent = formatINR(wc.rate);
-    const elWeekSalary = document.getElementById('dashWeekSalary');
-    if (elWeekSalary) elWeekSalary.textContent = formatINR(wc.salary);
-    const elWeekExpenses = document.getElementById('dashWeekExpenses');
-    if (elWeekExpenses) elWeekExpenses.textContent = formatINR(wc.expenses);
-    const elWeekProfit = document.getElementById('dashWeekProfit');
-    if (elWeekProfit) {
-      elWeekProfit.textContent = formatINR(weekProfitMetrics.totalProfit);
-      elWeekProfit.style.color = weekProfitMetrics.totalProfit >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
-    }
-    const weekBaseProfit = document.getElementById('dashWeekBaseProfit');
-    if (weekBaseProfit) weekBaseProfit.textContent = formatINR(weekProfitMetrics.profitWithoutCommission);
-    const weekCommission = document.getElementById('dashWeekCommission');
-    if (weekCommission) weekCommission.textContent = formatINR(weekProfitMetrics.commissionAmount);
-    const weekTotalProfit = document.getElementById('dashWeekTotalProfit');
-    if (weekTotalProfit) weekTotalProfit.textContent = formatINR(weekProfitMetrics.totalProfit);
-
-    const setOverviewBadge = (id, delta, type = 'number', unit = '', inv = false) => {
-      const el = document.getElementById(id);
-      if (!el) return;
-      const d = formatDeltaDisplay(delta, type, unit, inv);
-      el.className = `dash-metric-compare ${d.cls}`;
-      el.textContent = d.text;
-    };
-
-    setOverviewBadge('dashWeekCutsGrowth', wg.deltaBoxes, 'number', isEn ? 'Boxes' : 'கட்டை');
-    setOverviewBadge('dashWeekProfitGrowth', wg.deltaProfit, 'currency');
-  }
-
-  const monthData = data.monthComparison;
-  if (monthData && monthData.current) {
-    const mc = monthData.current;
-    const mg = monthData.growth;
-    const monthProfitMetrics = getProfitMetrics(mc);
-    const elMonthCuts = document.getElementById('dashMonthCuts');
-    if (elMonthCuts) elMonthCuts.innerHTML = `${formatNumber(mc.boxes)} <span class="metric-unit">${isEn ? 'Boxes' : 'கட்டை'}</span>`;
-    const elMonthBeedis = document.getElementById('dashMonthBeedis');
-    if (elMonthBeedis) elMonthBeedis.textContent = `${formatNumber(mc.beedis)} Pcs (${formatNumber(mc.cuts)} Cuts)`;
-
-    const elMonthRate = document.getElementById('dashMonthRate');
-    if (elMonthRate) elMonthRate.textContent = formatINR(mc.rate);
-    const elMonthSalary = document.getElementById('dashMonthSalary');
-    if (elMonthSalary) elMonthSalary.textContent = formatINR(mc.salary);
-    const elMonthExpenses = document.getElementById('dashMonthExpenses');
-    if (elMonthExpenses) elMonthExpenses.textContent = formatINR(mc.expenses);
-    const elMonthProfit = document.getElementById('dashMonthProfit');
-    if (elMonthProfit) {
-      elMonthProfit.textContent = formatINR(monthProfitMetrics.totalProfit);
-      elMonthProfit.style.color = monthProfitMetrics.totalProfit >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
-    }
-    const monthBaseProfit = document.getElementById('dashMonthBaseProfit');
-    if (monthBaseProfit) monthBaseProfit.textContent = formatINR(monthProfitMetrics.profitWithoutCommission);
-    const monthCommission = document.getElementById('dashMonthCommission');
-    if (monthCommission) monthCommission.textContent = formatINR(monthProfitMetrics.commissionAmount);
-    const monthTotalProfit = document.getElementById('dashMonthTotalProfit');
-    if (monthTotalProfit) monthTotalProfit.textContent = formatINR(monthProfitMetrics.totalProfit);
-
-    const setOverviewBadge = (id, delta, type = 'number', unit = '', inv = false) => {
-      const el = document.getElementById(id);
-      if (!el) return;
-      const d = formatDeltaDisplay(delta, type, unit, inv);
-      el.className = `dash-metric-compare ${d.cls}`;
-      el.textContent = d.text;
-    };
-
-    setOverviewBadge('dashMonthCutsGrowth', mg.deltaBoxes, 'number', isEn ? 'Boxes' : 'கட்டை');
-    setOverviewBadge('dashMonthProfitGrowth', mg.deltaProfit, 'currency');
-  }
-
-  // 6. Period Breakdown Summary Table
-  const tbody = document.getElementById('dashSummaryTableBody');
-  if (tbody && data.timeSeries) {
-    if (data.timeSeries.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="12" style="text-align: center; color: var(--text-dim);">${isEn ? 'No records for this period' : 'இந்த காலக்கட்டத்தில் பதிவுகள் இல்லை'}</td></tr>`;
-    } else {
-      tbody.innerHTML = data.timeSeries.map(row => {
-        const rowProfitMetrics = getProfitMetrics(row);
-        return `
-        <tr>
-          <td><strong>${formatDate(row.date || row.displayDate)}</strong></td>
-          <td><span class="badge badge-accent">${row.boxes || 0} Boxes</span></td>
-          <td>${formatNumber(row.cuts)}</td>
-          <td>${formatNumber(row.beedis)}</td>
-          <td>${Number(row.tobaccoKg || 0).toFixed(2)} kg</td>
-          <td>${Number(row.powderKg || 0).toFixed(2)} kg</td>
-          <td>${formatINR(row.salary)}</td>
-          <td><strong>${formatINR(row.rate)}</strong></td>
-          <td>${formatINR(row.expenses)}</td>
-          <td>${formatINR(rowProfitMetrics.profitWithoutCommission)}</td>
-          <td>${formatINR(rowProfitMetrics.commissionAmount)}</td>
-          <td class="total-profit-cell" style="font-weight: 800; color: ${(rowProfitMetrics.totalProfit >= 0) ? 'var(--accent-green)' : 'var(--accent-red)'}">${formatINR(rowProfitMetrics.totalProfit)}</td>
-        </tr>
-      `;
-      }).join('');
-    }
-  }
-}
-
-// 3. Comparative Growth Formatting in Numbers
-function formatDeltaDisplay(deltaVal, type = 'number', unit = '', isInverse = false) {
-  if (deltaVal === undefined || deltaVal === null || isNaN(Number(deltaVal))) {
-    return { text: '—', cls: 'neutral', num: 0 };
-  }
-  const num = Number(deltaVal);
-  let cls = 'neutral';
-  let sign = '';
-
-  if (num > 0) {
-    sign = '+';
-    cls = isInverse ? 'down' : 'up';
-  } else if (num < 0) {
-    sign = '';
-    cls = isInverse ? 'up' : 'down';
-  }
-
-  let valStr = '';
-  if (type === 'currency') {
-    valStr = (num < 0 ? '-₹' : sign + '₹') + Math.abs(Math.round(num)).toLocaleString('en-IN');
-  } else if (type === 'weight') {
-    valStr = `${sign}${num.toFixed(1)} ${unit}`.trim();
   } else {
-    valStr = `${sign}${Math.round(num).toLocaleString('en-IN')} ${unit}`.trim();
-  }
-
-  return { text: valStr, cls, num };
-}
-
-function updateCompItem(prefix, curVal, prevVal, deltaVal, type = 'number', unit = '', isInverse = false) {
-  const elCur = document.getElementById(`compCur${prefix}`);
-  const elPrev = document.getElementById(`compPrev${prefix}`);
-  const elGrowth = document.getElementById(`compGrowth${prefix}`);
-  const elDelta = document.getElementById(`compDelta${prefix}`);
-
-  let curStr = '', prevStr = '';
-  if (type === 'currency') {
-    curStr = `₹${Math.round(curVal || 0).toLocaleString('en-IN')}`;
-    prevStr = `₹${Math.round(prevVal || 0).toLocaleString('en-IN')}`;
-  } else if (type === 'weight') {
-    curStr = `${Number(curVal || 0).toFixed(1)} ${unit}`;
-    prevStr = `${Number(prevVal || 0).toFixed(1)} ${unit}`;
-  } else {
-    curStr = `${Math.round(curVal || 0).toLocaleString('en-IN')} ${unit}`.trim();
-    prevStr = `${Math.round(prevVal || 0).toLocaleString('en-IN')} ${unit}`.trim();
-  }
-
-  if (elCur) elCur.textContent = curStr;
-  if (elPrev) elPrev.textContent = prevStr;
-
-  const d = formatDeltaDisplay(deltaVal, type, unit, isInverse);
-  if (elGrowth) {
-    elGrowth.className = `comp-growth-pill ${d.cls}`;
-    elGrowth.textContent = d.text;
-  }
-  if (elDelta) {
-    elDelta.textContent = `Δ ${d.text}`;
+    banner.style.display = 'none';
   }
 }
 
-function renderPeriodComparisonCard(data, period = currentComparisonPeriod) {
-  if (!data) return;
-  const isEn = (typeof currentLanguage !== 'undefined' && currentLanguage === 'en');
+// ── Chart History API ─────────────────────────────────────────────────────────
+async function loadChartHistory(granularity) {
+  if (chartHistoryCache[granularity]) return chartHistoryCache[granularity];
+  if (chartHistoryPromises[granularity]) return chartHistoryPromises[granularity];
 
-  let comp = null;
-  if (period === 'day') {
-    comp = data.dayComparison || (data.period === 'day' ? data.comparison : null);
-  } else if (period === 'month') {
-    comp = data.monthComparison || (data.period === 'month' ? data.comparison : null);
-  } else {
-    comp = data.weekComparison || (data.period === 'week' ? data.comparison : null);
-  }
-
-  if (!comp) comp = data.comparison;
-  if (!comp || !comp.growth || !comp.current || !comp.previous) return;
-
-  const g = comp.growth;
-
-  const compTag = document.getElementById('comparisonPeriodTag');
-  const subTitle = document.getElementById('comparisonSubtitle');
-  const commissionLabel = document.getElementById('comparisonCommissionLabel');
-
-  let commissionPeriodText = isEn ? "Today's Commission" : 'இன்றைய கமிஷன்';
-  if (period === 'week') commissionPeriodText = isEn ? 'This Week Commission' : 'இந்த வார கமிஷன்';
-  if (period === 'month') commissionPeriodText = isEn ? 'This Month Commission' : 'இந்த மாத கமிஷன்';
-  if (commissionLabel) commissionLabel.textContent = commissionPeriodText;
-
-  if (period === 'day') {
-    if (compTag) compTag.textContent = isEn ? 'Today vs Yesterday' : 'இன்று vs நேற்று';
-    if (subTitle) subTitle.textContent = isEn
-      ? 'Direct benchmark comparison against yesterday'
-      : 'இன்றைய தினத்திற்கும் நேற்றைய தினத்திற்கும் நேரடி ஒப்பீடு (Today vs Yesterday Direct Comparison)';
-  } else if (period === 'month') {
-    if (compTag) compTag.textContent = isEn ? 'This Month vs Previous Month' : 'இந்த மாதம் vs கடந்த மாதம்';
-    if (subTitle) subTitle.textContent = isEn
-      ? 'Direct benchmark comparison against the previous month'
-      : 'இந்த மாதத்திற்கும் கடந்த மாதத்திற்கும் நேரடி ஒப்பீடு (This Month vs Previous Month Direct Comparison)';
-  } else {
-    if (compTag) compTag.textContent = isEn ? 'This Week vs Previous Week' : 'இந்த வாரம் vs கடந்த வாரம்';
-    if (subTitle) subTitle.textContent = isEn
-      ? 'Direct benchmark comparison against the previous week'
-      : 'இந்த வாரத்திற்கும் கடந்த வாரத்திற்கும் நேரடி ஒப்பீடு (This Week vs Previous Week Direct Comparison)';
-  }
-
-  let curColText = isEn ? 'Today' : 'இன்று (Today)';
-  let prevColText = isEn ? 'Yesterday' : 'நேற்று (Yesterday)';
-  if (period === 'week') {
-    curColText = isEn ? 'This Week' : 'இந்த வாரம் (This Week)';
-    prevColText = isEn ? 'Last Week' : 'கடந்த வாரம் (Last Week)';
-  } else if (period === 'month') {
-    curColText = isEn ? 'This Month' : 'இந்த மாதம் (This Month)';
-    prevColText = isEn ? 'Last Month' : 'கடந்த மாதம் (Last Month)';
-  }
-
-  document.querySelectorAll('.comp-label-current').forEach(el => {
-    el.textContent = curColText;
-  });
-  document.querySelectorAll('.comp-label-previous').forEach(el => {
-    el.textContent = prevColText;
-  });
-
-  const deltaBoxes = g.deltaBoxes !== undefined ? g.deltaBoxes : (g.boxesDelta !== undefined ? g.boxesDelta : Number((comp.current.boxes - comp.previous.boxes).toFixed(1)));
-  const deltaBeedis = g.deltaBeedis !== undefined ? g.deltaBeedis : (g.beedisDelta !== undefined ? g.beedisDelta : (comp.current.beedis - comp.previous.beedis));
-  const deltaRate = g.deltaRate !== undefined ? g.deltaRate : (g.rateDelta !== undefined ? g.rateDelta : (comp.current.rate - comp.previous.rate));
-  const deltaSalary = g.deltaSalary !== undefined ? g.deltaSalary : (g.salaryDelta !== undefined ? g.salaryDelta : (comp.current.salary - comp.previous.salary));
-  const deltaExpenses = g.deltaExpenses !== undefined ? g.deltaExpenses : (g.expensesDelta !== undefined ? g.expensesDelta : (comp.current.expenses - comp.previous.expenses));
-  const currentProfitMetrics = getProfitMetrics(comp.current);
-  const previousProfitMetrics = getProfitMetrics(comp.previous);
-  const deltaProfit = currentProfitMetrics.totalProfit - previousProfitMetrics.totalProfit;
-  const deltaBaseProfit = currentProfitMetrics.profitWithoutCommission - previousProfitMetrics.profitWithoutCommission;
-  const deltaCommission = currentProfitMetrics.commissionAmount - previousProfitMetrics.commissionAmount;
-
-  updateCompItem('Boxes', comp.current.boxes, comp.previous.boxes, deltaBoxes, 'number', isEn ? 'Boxes' : 'கட்டை');
-  updateCompItem('Beedis', comp.current.beedis, comp.previous.beedis, deltaBeedis, 'number', 'Pcs');
-  updateCompItem('Rate', comp.current.rate, comp.previous.rate, deltaRate, 'currency');
-  updateCompItem('Salary', comp.current.salary, comp.previous.salary, deltaSalary, 'currency');
-  updateCompItem('Expenses', comp.current.expenses, comp.previous.expenses, deltaExpenses, 'currency', '', true);
-  updateCompItem('Profit', currentProfitMetrics.totalProfit, previousProfitMetrics.totalProfit, deltaProfit, 'currency');
-  updateCompItem('BaseProfit', currentProfitMetrics.profitWithoutCommission, previousProfitMetrics.profitWithoutCommission, deltaBaseProfit, 'currency');
-  updateCompItem('Commission', currentProfitMetrics.commissionAmount, previousProfitMetrics.commissionAmount, deltaCommission, 'currency');
-}
-
-function switchDashboardBarChartFilter(type, granularity) {
-  if (type === 'prod') {
-    dashProdGranularity = granularity;
-    const btns = document.querySelectorAll('#dashProdChartFilterGroup .chart-filter-btn');
-    btns.forEach(b => b.classList.remove('active'));
-    const b = document.getElementById(granularity === 'day' ? 'dashProdFilterDay' : (granularity === 'week' ? 'dashProdFilterWeek' : 'dashProdFilterMonth'));
-    if (b) b.classList.add('active');
-    loadDashboardChartHistory(granularity).then(history => renderDashboardProductionBarChart(history, granularity));
-  } else if (type === 'export') {
-    dashExportGranularity = granularity;
-    const btns = document.querySelectorAll('#dashExportChartFilterGroup .chart-filter-btn');
-    btns.forEach(b => b.classList.remove('active'));
-    const b = document.getElementById(granularity === 'day' ? 'dashExportFilterDay' : (granularity === 'week' ? 'dashExportFilterWeek' : 'dashExportFilterMonth'));
-    if (b) b.classList.add('active');
-    loadDashboardChartHistory(granularity).then(history => renderDashboardExportBarChart(history, granularity));
-  } else if (type === 'profit') {
-    dashProfitGranularity = granularity;
-    const btns = document.querySelectorAll('#dashProfitChartFilterGroup .chart-filter-btn');
-    btns.forEach(b => b.classList.remove('active'));
-    const b = document.getElementById(granularity === 'day' ? 'dashProfitFilterDay' : (granularity === 'week' ? 'dashProfitFilterWeek' : 'dashProfitFilterMonth'));
-    if (b) b.classList.add('active');
-    loadDashboardChartHistory(granularity).then(history => renderDashboardProfitBarChart(history, granularity));
-  }
-}
-
-// 1. Dashboard Production Bar Chart (Day / Week / Month)
-function renderDashboardProductionBarChart(data, granularity = dashProdGranularity) {
-  const canvas = document.getElementById('dashChartProdBar');
-  if (!canvas || typeof Chart === 'undefined') return;
-
-  dashProdGranularity = granularity;
-  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-  const textColor = isDark ? '#94a3b8' : '#475569';
-  const gridColor = isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.05)';
-  const fontFam = "'Outfit', 'Mukta Malar', sans-serif";
-  const isEn = (typeof currentLanguage !== 'undefined' && currentLanguage === 'en');
-
-  let labels = [];
-  let boxes = [];
-  let cuts = [];
-
-  if (data && data.series) {
-    labels = data.series.map(row => row.label);
-    boxes = data.series.map(row => row.prodBoxes || 0);
-    cuts = data.series.map(row => row.prodCuts || 0);
-  } else if (granularity === 'month' && data && data.monthlyHistory) {
-    labels = data.monthlyHistory.map(m => m.label);
-    boxes = data.monthlyHistory.map(m => Number((m.boxes || 0).toFixed(1)));
-    cuts = data.monthlyHistory.map(m => m.cuts || 0);
-  } else if (granularity === 'week') {
-    const ts = (data && data.timeSeries) ? data.timeSeries : [];
-    const weekBuckets = {};
-    ts.forEach(d => {
-      const dt = getCalendarDate(d.date || d.displayDate);
-      const mon = getWeekBucket(dt);
-      const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
-      const k = `${mon.getFullYear()}-${String(mon.getMonth() + 1).padStart(2, '0')}-${String(mon.getDate()).padStart(2, '0')}`;
-      const lbl = `${mon.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })} - ${sun.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}`;
-      if (!weekBuckets[k]) weekBuckets[k] = { label: lbl, boxes: 0, cuts: 0, rate: 0 };
-      weekBuckets[k].boxes += (d.boxes || 0);
-      weekBuckets[k].cuts += (d.cuts || 0);
-      weekBuckets[k].rate += (d.rate || 0);
+  const limit = granularity === 'day' ? 14 : granularity === 'week' ? 12 : 12;
+  chartHistoryPromises[granularity] = fetch(`/api/analytics/history?granularity=${granularity}&limit=${limit}`)
+    .then(res => {
+      if (!res.ok) throw new Error('Chart history unavailable');
+      return res.json();
+    })
+    .then(json => {
+      chartHistoryCache[granularity] = json;
+      return json;
+    })
+    .catch(err => {
+      console.warn(`[Dashboard] Chart history (${granularity}) error:`, err);
+      return { series: [] };
+    })
+    .finally(() => {
+      delete chartHistoryPromises[granularity];
     });
-    const wkKeys = Object.keys(weekBuckets).sort().slice(-8);
-    labels = wkKeys.map(k => weekBuckets[k].label);
-    boxes = wkKeys.map(k => Number(weekBuckets[k].boxes.toFixed(1)));
-    cuts = wkKeys.map(k => weekBuckets[k].cuts);
-  } else {
-    // day-wise
-    const ts = (data && data.timeSeries) ? data.timeSeries.slice(-14) : [];
-    labels = ts.map(d => d.displayDate || d.date);
-    boxes = ts.map(d => Number((d.boxes || 0).toFixed(1)));
-    cuts = ts.map(d => d.cuts || 0);
-  }
 
-  if (dashProdChartInstance) dashProdChartInstance.destroy();
-
-  dashProdChartInstance = new Chart(canvas, {
-    type: 'bar',
-    data: {
-      labels,
-      datasets: [
-        {
-          label: isEn ? 'Boxes (கட்டை)' : 'கட்டை (Boxes)',
-          data: boxes,
-          backgroundColor: 'rgba(217, 119, 6, 0.85)',
-          hoverBackgroundColor: '#d97706',
-          borderRadius: 6,
-          yAxisID: 'y'
-        }
-      ]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      interaction: { mode: 'index', intersect: false },
-      plugins: {
-        legend: {
-          position: 'top',
-          labels: { color: textColor, font: { family: fontFam, size: 11, weight: 'bold' } }
-        },
-        tooltip: {
-          callbacks: {
-            label: function(ctx) {
-              const lbl = ctx.dataset.label || '';
-              const val = ctx.raw;
-              const idx = ctx.dataIndex;
-              const c = cuts[idx] || 0;
-              return `${lbl}: ${val} (${c} cuts)`;
-            }
-          }
-        }
-      },
-      scales: {
-        x: { ticks: { color: textColor, font: { family: fontFam, size: 11 } }, grid: { color: gridColor } },
-        y: {
-          type: 'linear',
-          display: true,
-          position: 'left',
-          title: { display: true, text: isEn ? 'Boxes' : 'கட்டை', color: textColor, font: { family: fontFam, size: 11 } },
-          ticks: { color: textColor, font: { family: fontFam, size: 11 } },
-          grid: { color: gridColor }
-        }
-      }
-    }
-  });
+  return chartHistoryPromises[granularity];
 }
 
-// 2. Dashboard Export Bar Chart (Day / Week / Month)
-function renderDashboardExportBarChart(data, granularity = dashExportGranularity) {
-  const canvas = document.getElementById('dashChartExportBar');
-  if (!canvas || typeof Chart === 'undefined') return;
+// ── Chart: Export Trend ───────────────────────────────────────────────────────
+function renderExportChart(data, granularity) {
+  const canvas = document.getElementById('dashExportChart');
+  const emptyEl = document.getElementById('exportChartEmpty');
+  if (!canvas) return;
+  const series = (data && data.series) ? data.series : [];
 
-  dashExportGranularity = granularity;
-  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-  const textColor = isDark ? '#94a3b8' : '#475569';
-  const gridColor = isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.05)';
-  const fontFam = "'Outfit', 'Mukta Malar', sans-serif";
-  const isEn = (typeof currentLanguage !== 'undefined' && currentLanguage === 'en');
-
-  const exportsList = data && data.series
-    ? data.series.map(row => ({
-      date: row.key,
-      boxes: row.exportBoxes,
-      rate: row.exportRate,
-      margin: row.exportMargin
-    }))
-    : [];
-
-  const buckets = {};
-  exportsList.forEach(e => {
-    if (!e.date) return;
-    const d = getCalendarDate(e.date);
-    let key = '';
-    let label = '';
-    if (granularity === 'day') {
-      key = d.toISOString().split('T')[0];
-      label = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
-    } else if (granularity === 'week') {
-      const mon = getWeekBucket(d);
-      const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
-      key = `${mon.getFullYear()}-${String(mon.getMonth() + 1).padStart(2, '0')}-${String(mon.getDate()).padStart(2, '0')}`;
-      label = `${mon.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })} - ${sun.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}`;
-    } else if (granularity === 'month') {
-      key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-      label = d.toLocaleDateString('en-GB', { month: 'short', year: '2-digit' });
-    }
-    if (!buckets[key]) buckets[key] = { key, label, boxes: 0, rate: 0, margin: 0 };
-    const bCount = (e.boxes !== undefined && e.boxes !== null && e.boxes > 0) ? e.boxes : ((e.cuts || 0) / 300);
-    buckets[key].boxes += bCount;
-    buckets[key].rate += (e.rate || 0);
-    buckets[key].margin += (e.margin !== undefined ? e.margin : ((e.rate || 0) - (e.salary || 0)));
-  });
-
-  const sortedKeys = Object.keys(buckets).sort();
-  const limit = granularity === 'day' ? 14 : (granularity === 'week' ? 8 : 12);
-  const activeKeys = sortedKeys.slice(-limit);
-
-  const labels = activeKeys.map(k => buckets[k].label);
-  const boxes = activeKeys.map(k => Number(buckets[k].boxes.toFixed(1)));
-  const rate = activeKeys.map(k => buckets[k].rate);
-  const margin = activeKeys.map(k => buckets[k].margin);
-
-  if (dashExportChartInstance) dashExportChartInstance.destroy();
-
-  dashExportChartInstance = new Chart(canvas, {
-    type: 'bar',
-    data: {
-      labels: labels.length > 0 ? labels : (isEn ? ['No Export Data'] : ['ஏற்றுமதி விவரம் இல்லை']),
-      datasets: [
-        {
-          label: isEn ? 'Exported Boxes' : 'ஏற்றுமதி கட்டை (Boxes)',
-          data: labels.length > 0 ? boxes : [0],
-          backgroundColor: 'rgba(37, 99, 235, 0.85)',
-          hoverBackgroundColor: '#2563eb',
-          borderRadius: 6,
-          yAxisID: 'y'
-        },
-        {
-          label: isEn ? 'Export Value (₹)' : 'ஏற்றுமதி மதிப்பு (₹)',
-          data: labels.length > 0 ? rate : [0],
-          backgroundColor: 'rgba(16, 185, 129, 0.8)',
-          hoverBackgroundColor: '#10b981',
-          borderRadius: 6,
-          yAxisID: 'y1'
-        },
-        {
-          label: isEn ? 'Export Margin (₹)' : 'ஏற்றுமதி லாபம் (₹)',
-          data: labels.length > 0 ? margin : [0],
-          backgroundColor: 'rgba(245, 158, 11, 0.85)',
-          hoverBackgroundColor: '#f59e0b',
-          borderRadius: 6,
-          yAxisID: 'y1'
-        }
-      ]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      interaction: { mode: 'index', intersect: false },
-      plugins: {
-        legend: {
-          position: 'top',
-          labels: { color: textColor, font: { family: fontFam, size: 11, weight: 'bold' } }
-        },
-        tooltip: {
-          callbacks: {
-            label: function(ctx) {
-              const lbl = ctx.dataset.label || '';
-              const val = ctx.raw;
-              if (ctx.dataset.yAxisID === 'y1') return `${lbl}: ₹${Number(val).toLocaleString('en-IN')}`;
-              return `${lbl}: ${val} Boxes`;
-            }
-          }
-        }
-      },
-      scales: {
-        x: { ticks: { color: textColor, font: { family: fontFam, size: 11 } }, grid: { color: gridColor } },
-        y: {
-          type: 'linear',
-          display: true,
-          position: 'left',
-          title: { display: true, text: isEn ? 'Boxes' : 'கட்டை', color: textColor, font: { family: fontFam, size: 11 } },
-          ticks: { color: textColor, font: { family: fontFam, size: 11 } },
-          grid: { color: gridColor }
-        },
-        y1: {
-          type: 'linear',
-          display: true,
-          position: 'right',
-          title: { display: true, text: '₹ Amount', color: textColor, font: { family: fontFam, size: 11 } },
-          grid: { drawOnChartArea: false },
-          ticks: {
-            color: textColor,
-            font: { family: fontFam, size: 11 },
-            callback: v => '₹' + v.toLocaleString('en-IN')
-          }
-        }
-      }
-    }
-  });
-}
-
-// 3. Dashboard Financial & Profit Bar Chart (Day / Week / Month)
-function renderDashboardProfitBarChart(data, granularity = dashProfitGranularity) {
-  const canvas = document.getElementById('dashChartProfitBar');
-  if (!canvas || typeof Chart === 'undefined') return;
-
-  dashProfitGranularity = granularity;
-  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-  const textColor = isDark ? '#94a3b8' : '#475569';
-  const gridColor = isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.05)';
-  const fontFam = "'Outfit', 'Mukta Malar', sans-serif";
-  const isEn = (typeof currentLanguage !== 'undefined' && currentLanguage === 'en');
-
-  let labels = [];
-  let rateData = [];
-  let salaryData = [];
-  let expenseData = [];
-  let baseProfitData = [];
-  let commissionData = [];
-  let profitData = [];
-
-  if (data && data.series) {
-    labels = data.series.map(row => row.label);
-    rateData = data.series.map(row => row.prodRate || 0);
-    salaryData = data.series.map(row => row.prodSalary || 0);
-    expenseData = data.series.map(row => row.expenses || 0);
-    const seriesProfitMetrics = data.series.map(row => getProfitMetrics({
-      rate: row.prodRate,
-      salary: row.prodSalary,
-      expenses: row.expenses,
-      beedis: row.prodBeedis,
-      profitWithoutCommission: row.profitWithoutCommission,
-      commissionAmount: row.commissionAmount,
-      totalProfit: row.totalProfit
-    }));
-    baseProfitData = seriesProfitMetrics.map(metrics => metrics.profitWithoutCommission);
-    commissionData = seriesProfitMetrics.map(metrics => metrics.commissionAmount);
-    profitData = seriesProfitMetrics.map(metrics => metrics.totalProfit);
-  } else if (granularity === 'month' && data && data.monthlyHistory) {
-    labels = data.monthlyHistory.map(m => m.label);
-    rateData = data.monthlyHistory.map(m => m.rate || 0);
-    salaryData = data.monthlyHistory.map(m => m.salary || 0);
-    expenseData = data.monthlyHistory.map(m => m.expenses || 0);
-    const monthlyProfitMetrics = data.monthlyHistory.map(m => getProfitMetrics(m));
-    baseProfitData = monthlyProfitMetrics.map(metrics => metrics.profitWithoutCommission);
-    commissionData = monthlyProfitMetrics.map(metrics => metrics.commissionAmount);
-    profitData = monthlyProfitMetrics.map(metrics => metrics.totalProfit);
-  } else if (granularity === 'week') {
-    const ts = (data && data.timeSeries) ? data.timeSeries : [];
-    const weekBuckets = {};
-    ts.forEach(d => {
-      const dt = getCalendarDate(d.date || d.displayDate);
-      const mon = getWeekBucket(dt);
-      const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
-      const k = `${mon.getFullYear()}-${String(mon.getMonth() + 1).padStart(2, '0')}-${String(mon.getDate()).padStart(2, '0')}`;
-      const lbl = `${mon.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })} - ${sun.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}`;
-      if (!weekBuckets[k]) weekBuckets[k] = { label: lbl, rate: 0, salary: 0, expenses: 0, baseProfit: 0, commission: 0, profit: 0 };
-      weekBuckets[k].rate += (d.rate || 0);
-      weekBuckets[k].salary += (d.salary || 0);
-      weekBuckets[k].expenses += (d.expenses || 0);
-      const dayProfitMetrics = getProfitMetrics(d);
-      weekBuckets[k].baseProfit += dayProfitMetrics.profitWithoutCommission;
-      weekBuckets[k].commission += dayProfitMetrics.commissionAmount;
-      weekBuckets[k].profit += dayProfitMetrics.totalProfit;
-    });
-    const wkKeys = Object.keys(weekBuckets).sort().slice(-8);
-    labels = wkKeys.map(k => weekBuckets[k].label);
-    rateData = wkKeys.map(k => weekBuckets[k].rate);
-    salaryData = wkKeys.map(k => weekBuckets[k].salary);
-    expenseData = wkKeys.map(k => weekBuckets[k].expenses);
-    baseProfitData = wkKeys.map(k => weekBuckets[k].baseProfit);
-    commissionData = wkKeys.map(k => weekBuckets[k].commission);
-    profitData = wkKeys.map(k => weekBuckets[k].profit);
-  } else {
-    const ts = (data && data.timeSeries) ? data.timeSeries.slice(-14) : [];
-    labels = ts.map(d => d.displayDate || d.date);
-    rateData = ts.map(d => d.rate || 0);
-    salaryData = ts.map(d => d.salary || 0);
-    expenseData = ts.map(d => d.expenses || 0);
-    const dayProfitMetrics = ts.map(d => getProfitMetrics(d));
-    baseProfitData = dayProfitMetrics.map(metrics => metrics.profitWithoutCommission);
-    commissionData = dayProfitMetrics.map(metrics => metrics.commissionAmount);
-    profitData = dayProfitMetrics.map(metrics => metrics.totalProfit);
-  }
-
-  if (dashProfitChartInstance) dashProfitChartInstance.destroy();
-
-  dashProfitChartInstance = new Chart(canvas, {
-    type: 'bar',
-    data: {
-      labels,
-      datasets: [
-        {
-          label: isEn ? 'Rate Value (₹)' : 'Rate மதிப்பு (₹)',
-          data: rateData,
-          backgroundColor: 'rgba(217, 119, 6, 0.85)',
-          hoverBackgroundColor: '#d97706',
-          borderRadius: 6
-        },
-        {
-          label: isEn ? 'Salary (₹)' : 'கூலி (₹)',
-          data: salaryData,
-          backgroundColor: 'rgba(37, 99, 235, 0.85)',
-          hoverBackgroundColor: '#2563eb',
-          borderRadius: 6
-        },
-        {
-          label: isEn ? 'Expenses (₹)' : 'செலவுகள் (₹)',
-          data: expenseData,
-          backgroundColor: 'rgba(239, 68, 68, 0.8)',
-          hoverBackgroundColor: '#ef4444',
-          borderRadius: 6
-        },
-        {
-          label: isEn ? 'Net Profit (No Commission) (₹)' : 'நிகர லாபம் (கமிஷன் இல்லை) (₹)',
-          data: baseProfitData,
-          backgroundColor: 'rgba(14, 116, 144, 0.85)',
-          hoverBackgroundColor: '#0e7490',
-          borderRadius: 6
-        },
-        {
-          label: isEn ? 'Commission (₹)' : 'கமிஷன் (₹)',
-          data: commissionData,
-          backgroundColor: 'rgba(124, 58, 237, 0.85)',
-          hoverBackgroundColor: '#7c3aed',
-          borderRadius: 6
-        },
-        {
-          label: isEn ? 'Total Profit (₹)' : 'மொத்த லாபம் (₹)',
-          data: profitData,
-          backgroundColor: profitData.map(v => v >= 0 ? 'rgba(5, 150, 105, 0.88)' : 'rgba(220, 38, 38, 0.88)'),
-          hoverBackgroundColor: profitData.map(v => v >= 0 ? '#059669' : '#dc2626'),
-          borderRadius: 6
-        }
-      ]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      interaction: { mode: 'index', intersect: false },
-      plugins: {
-        legend: {
-          position: 'top',
-          labels: { color: textColor, font: { family: fontFam, size: 11, weight: 'bold' } }
-        },
-        tooltip: {
-          callbacks: {
-            label: function(ctx) {
-              const lbl = ctx.dataset.label || '';
-              const val = ctx.raw;
-              return `${lbl}: ₹${Number(val).toLocaleString('en-IN')}`;
-            }
-          }
-        }
-      },
-      scales: {
-        x: { ticks: { color: textColor, font: { family: fontFam, size: 11 } }, grid: { color: gridColor } },
-        y: {
-          ticks: {
-            color: textColor,
-            font: { family: fontFam, size: 11 },
-            callback: v => '₹' + v.toLocaleString('en-IN')
-          },
-          grid: { color: gridColor }
-        }
-      }
-    }
-  });
-}
-
-async function renderDashboardCharts(data) {
-  if (typeof Chart === 'undefined') return;
-  if (!data) return;
-
-  const granularities = new Set([dashProdGranularity, dashExportGranularity, dashProfitGranularity]);
-  const histories = await Promise.all([...granularities].map(granularity => loadDashboardChartHistory(granularity)));
-  const historyByGranularity = Object.fromEntries([...granularities].map((granularity, index) => [granularity, histories[index]]));
-  const isEn = typeof currentLanguage !== 'undefined' && currentLanguage === 'en';
-  const updateChartStatus = (id, series, fields) => {
-    const element = document.getElementById(id);
-    if (!element) return;
-    const hasData = series.some(row => fields.some(field => Number(row[field] || 0) !== 0));
-    element.textContent = hasData ? '' : (isEn ? 'No data for this range' : 'இந்த காலத்திற்கு தரவு இல்லை');
-    element.hidden = hasData;
-  };
-  updateChartStatus('dashProdChartStatus', historyByGranularity[dashProdGranularity].series || [], ['prodBoxes', 'prodRate']);
-  updateChartStatus('dashExportChartStatus', historyByGranularity[dashExportGranularity].series || [], ['exportBoxes', 'exportRate']);
-  updateChartStatus('dashProfitChartStatus', historyByGranularity[dashProfitGranularity].series || [], ['prodRate', 'prodSalary', 'expenses', 'netProfit']);
-  renderDashboardProductionBarChart(historyByGranularity[dashProdGranularity], dashProdGranularity);
-  renderDashboardExportBarChart(historyByGranularity[dashExportGranularity], dashExportGranularity);
-  renderDashboardProfitBarChart(historyByGranularity[dashProfitGranularity], dashProfitGranularity);
-}
-
-function exportDashboardPeriodCSV() {
-  if (!cachedAnalytics || !cachedAnalytics.timeSeries || cachedAnalytics.timeSeries.length === 0) {
-    showToast('No data to export', 'warning');
+  if (series.length === 0) {
+    if (emptyEl) emptyEl.hidden = false;
+    if (exportChartInstance) { exportChartInstance.destroy(); exportChartInstance = null; }
     return;
   }
-  const headers = ['Date', 'Boxes', 'Cuts', 'Beedis', 'Tobacco_kg', 'Powder_kg', 'Salary_INR', 'Rate_INR', 'Expenses_INR', 'Profit_INR'];
-  const rows = cachedAnalytics.timeSeries.map(r => [
-    r.date ? r.date.split('T')[0] : '',
-    r.boxes || 0,
-    r.cuts || 0,
-    r.beedis || 0,
-    (r.tobaccoKg || 0).toFixed(2),
-    (r.powderKg || 0).toFixed(2),
-    r.salary || 0,
-    r.rate || 0,
-    r.expenses || 0,
-    r.profit || 0
-  ]);
-  const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
-  const encodedUri = encodeURI(csvContent);
-  const link = document.createElement('a');
-  link.setAttribute('href', encodedUri);
-  link.setAttribute('download', `TVS_Dashboard_${currentDashboardPeriod}_${getTodayISODate()}.csv`);
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  showToast('Dashboard CSV downloaded successfully', 'success');
+  if (emptyEl) emptyEl.hidden = true;
+
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  const isEn = (typeof currentLanguage !== 'undefined' && currentLanguage === 'en');
+  const labels = series.map(r => r.label || r.key || '');
+  const values = series.map(r => Number(r.exportBoxes ?? r.prodBoxes ?? 0));
+
+  const chartColor = isDark ? 'rgba(245, 158, 11, 0.85)' : 'rgba(217, 119, 6, 0.85)';
+  const chartColorFill = isDark ? 'rgba(245, 158, 11, 0.15)' : 'rgba(217, 119, 6, 0.1)';
+  const gridColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
+  const labelColor = isDark ? '#94a3b8' : '#64748b';
+
+  if (exportChartInstance) exportChartInstance.destroy();
+  exportChartInstance = new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: isEn ? 'Boxes Exported' : 'ஏற்றுமதி கட்டை',
+        data: values,
+        backgroundColor: chartColorFill,
+        borderColor: chartColor,
+        borderWidth: 2,
+        borderRadius: 5,
+        borderSkipped: false
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 700, easing: 'easeOutQuart' },
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: isDark ? '#1e293b' : '#ffffff',
+          titleColor: isDark ? '#f8fafc' : '#0f172a',
+          bodyColor: isDark ? '#94a3b8' : '#475569',
+          borderColor: isDark ? '#27354f' : '#e2e8f0',
+          borderWidth: 1,
+          cornerRadius: 10,
+          displayColors: false,
+          padding: 10,
+          callbacks: {
+            label: ctx => `${ctx.parsed.y} ${isEn ? 'Boxes' : 'கட்டை'}`
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: { display: false },
+          ticks: { color: labelColor, font: { size: 11, weight: '600' }, maxRotation: 0 }
+        },
+        y: {
+          beginAtZero: true,
+          grid: { color: gridColor },
+          ticks: { color: labelColor, font: { size: 11 }, maxTicksLimit: 5 }
+        }
+      }
+    }
+  });
 }
 
-// Re-render when theme or language changes
-window.addEventListener('themeChanged', () => {
-  if (cachedAnalytics) renderDashboardCharts(cachedAnalytics);
-});
+// ── Chart: Profit Trend ───────────────────────────────────────────────────────
+function renderProfitChart(data, granularity) {
+  const canvas = document.getElementById('dashProfitChart');
+  const emptyEl = document.getElementById('profitChartEmpty');
+  if (!canvas) return;
+  const series = (data && data.series) ? data.series : [];
 
-window.addEventListener('languageChanged', () => {
-  updateDashboardPeriodPills();
-  if (dashboardOverviewHistoryCache.week) populateWeeklyOverviewFilters(dashboardOverviewHistoryCache.week);
-  if (dashboardOverviewHistoryCache.month) populateMonthlyOverviewFilter(dashboardOverviewHistoryCache.month);
-    if (dashboardOverviewHistoryCache.day) populateDailyOverviewFilter(dashboardOverviewHistoryCache.day);
-  if (cachedAnalytics) {
-    renderDashboardUI(cachedAnalytics);
-    renderDashboardCharts(cachedAnalytics);
+  if (series.length === 0) {
+    if (emptyEl) emptyEl.hidden = false;
+    if (profitChartInstance) { profitChartInstance.destroy(); profitChartInstance = null; }
+    return;
   }
-});
+  if (emptyEl) emptyEl.hidden = true;
 
-window.addEventListener('settingsLoaded', () => {
-  updateDashboardRatios();
-  if (cachedAnalytics) {
-    renderDashboardUI(cachedAnalytics);
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  const isEn = (typeof currentLanguage !== 'undefined' && currentLanguage === 'en');
+  const labels = series.map(r => r.label || r.key || '');
+  const profitValues = series.map(r => {
+    const netProfit = r.totalProfit ?? r.netProfit ?? r.prodProfit ?? 0;
+    return Number(netProfit);
+  });
+
+  const posColor = isDark ? 'rgba(16,185,129,0.85)' : 'rgba(5,150,105,0.85)';
+  const negColor = isDark ? 'rgba(239,68,68,0.85)' : 'rgba(220,38,38,0.85)';
+  const gridColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
+  const labelColor = isDark ? '#94a3b8' : '#64748b';
+
+  const barColors = profitValues.map(v => v >= 0 ? posColor.replace('0.85', '0.2') : negColor.replace('0.85', '0.15'));
+  const borderColors = profitValues.map(v => v >= 0 ? posColor : negColor);
+
+  if (profitChartInstance) profitChartInstance.destroy();
+  profitChartInstance = new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: isEn ? 'Net Profit' : 'நிகர லாபம்',
+        data: profitValues,
+        backgroundColor: barColors,
+        borderColor: borderColors,
+        borderWidth: 2,
+        borderRadius: 5,
+        borderSkipped: false
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 700, easing: 'easeOutQuart' },
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: isDark ? '#1e293b' : '#ffffff',
+          titleColor: isDark ? '#f8fafc' : '#0f172a',
+          bodyColor: isDark ? '#94a3b8' : '#475569',
+          borderColor: isDark ? '#27354f' : '#e2e8f0',
+          borderWidth: 1,
+          cornerRadius: 10,
+          displayColors: false,
+          padding: 10,
+          callbacks: {
+            label: ctx => `₹${Number(ctx.parsed.y).toLocaleString('en-IN')}`
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: { display: false },
+          ticks: { color: labelColor, font: { size: 11, weight: '600' }, maxRotation: 0 }
+        },
+        y: {
+          grid: { color: gridColor },
+          ticks: {
+            color: labelColor,
+            font: { size: 11 },
+            maxTicksLimit: 5,
+            callback: v => `₹${Math.abs(v) >= 1000 ? (v / 1000).toFixed(0) + 'K' : v}`
+          }
+        }
+      }
+    }
+  });
+}
+
+// ── Chart Filter Switch ───────────────────────────────────────────────────────
+function switchDashChart(type, granularity) {
+  const isExport = type === 'export';
+  const filterGroup = document.getElementById(isExport ? 'exportChartFilters' : 'profitChartFilters');
+
+  // Update active button
+  if (filterGroup) {
+    filterGroup.querySelectorAll('.dash-chart-filter-btn').forEach(btn => btn.classList.remove('active'));
+    const activeBtn = filterGroup.querySelector(`#${isExport ? 'export' : 'profit'}Filter${granularity.charAt(0).toUpperCase() + granularity.slice(1)}`);
+    if (activeBtn) activeBtn.classList.add('active');
   }
-});
 
-// Initialization
-document.addEventListener('DOMContentLoaded', () => {
-  updateDashboardRatios();
-  setDashboardPeriod('day');
-});
+  if (isExport) {
+    exportChartGranularity = granularity;
+    loadChartHistory(granularity).then(d => renderExportChart(d, granularity));
+  } else {
+    profitChartGranularity = granularity;
+    loadChartHistory(granularity).then(d => renderProfitChart(d, granularity));
+  }
+}
+
+// ── Theme-aware chart refresh ─────────────────────────────────────────────────
+// Re-render charts when theme toggles so colors update correctly
+const _origToggleTheme = window.toggleTheme;
+window.toggleTheme = function () {
+  if (typeof _origToggleTheme === 'function') _origToggleTheme();
+  // Small delay lets CSS variables propagate before re-rendering
+  setTimeout(() => {
+    if (chartHistoryCache[exportChartGranularity]) {
+      renderExportChart(chartHistoryCache[exportChartGranularity], exportChartGranularity);
+    }
+    if (chartHistoryCache[profitChartGranularity]) {
+      renderProfitChart(chartHistoryCache[profitChartGranularity], profitChartGranularity);
+    }
+  }, 60);
+};
