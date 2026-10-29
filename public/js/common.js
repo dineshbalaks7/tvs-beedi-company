@@ -106,53 +106,14 @@ const nativeFetch = window.fetch.bind(window);
 
 // A page can remain open after its server-side session expires. Redirect it
 // when the next protected request confirms that authentication is no longer valid.
-let pendingRequests = 0;
-let loadingOverlayTimer = null;
-let loadingOverlayVisible = false;
-const LOADING_OVERLAY_DELAY_MS = 250;
-
 window.fetch = async function(...args) {
-  const requestUrl = typeof args[0] === 'string' ? args[0] : args[0]?.url || '';
-  const isChatRequest = requestUrl.includes('/api/chat');
-
-  // Chat has its own inline typing indicator instead of covering the conversation.
-  if (!isChatRequest) {
-    pendingRequests++;
-    if (pendingRequests === 1) {
-      loadingOverlayTimer = setTimeout(() => {
-        loadingOverlayTimer = null;
-        if (pendingRequests > 0) {
-          loadingOverlayVisible = true;
-          setAppLoading(true, 'Loading...');
-        }
-      }, LOADING_OVERLAY_DELAY_MS);
-    }
+  const response = await nativeFetch(...args);
+  // Handle session expiration
+  if (response.status === 401 && !redirectingToLogin && window.location.pathname !== '/login') {
+    redirectingToLogin = true;
+    window.location.replace('/login?expired=1');
   }
-  try {
-    const response = await nativeFetch(...args);
-    // Handle session expiration
-    if (response.status === 401 && !redirectingToLogin && window.location.pathname !== '/login') {
-      redirectingToLogin = true;
-      window.location.replace('/login?expired=1');
-    }
-    return response;
-  } finally {
-    // Decrement counter and hide overlay only when all requests complete
-    if (!isChatRequest) {
-      pendingRequests--;
-      if (pendingRequests <= 0) {
-        pendingRequests = 0;
-        if (loadingOverlayTimer !== null) {
-          clearTimeout(loadingOverlayTimer);
-          loadingOverlayTimer = null;
-        }
-        if (loadingOverlayVisible) {
-          loadingOverlayVisible = false;
-          setAppLoading(false);
-        }
-      }
-    }
-  }
+  return response;
 };
 
 // 1. Theme Management
