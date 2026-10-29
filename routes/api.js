@@ -1305,17 +1305,17 @@ router.get('/export/check-date', async (req, res) => {
 // Record new company export dispatch
 router.post('/export', async (req, res) => {
   try {
-    const { boxes, cuts, date, companyName, vehicleNo, challanNo, notes } = req.body;
+    const { boxes, cuts, beedis, date, companyName, vehicleNo, challanNo, notes } = req.body;
     const settings = await Settings.getSettings();
 
     let boxesNum = (boxes !== undefined && boxes !== null && boxes !== '') ? Number(boxes) : null;
     let cutsNum = (cuts !== undefined && cuts !== null && cuts !== '') ? Number(cuts) : null;
 
-    if (boxesNum === null && cutsNum === null) {
+    if (boxesNum === null && cutsNum === null && (beedis === undefined || beedis === null || beedis === '')) {
       return res.status(400).json({ error: 'Number of boxes or cuts must be greater than 0' });
     }
 
-    const metrics = calculateProductionMetrics({ boxes: boxesNum, cuts: cutsNum }, settings);
+    const metrics = calculateProductionMetrics({ boxes: boxesNum, cuts: cutsNum, beedis }, settings);
     if (metrics.beedis <= 0) {
       return res.status(400).json({ error: 'Export quantity must be greater than 0' });
     }
@@ -1375,7 +1375,7 @@ router.post('/export', async (req, res) => {
 router.put('/export/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { boxes, cuts, date, companyName, vehicleNo, challanNo, notes } = req.body;
+    const { boxes, cuts, beedis, date, companyName, vehicleNo, challanNo, notes } = req.body;
     const settings = await Settings.getSettings();
 
     const exportRecord = await Export.findById(id);
@@ -1386,11 +1386,11 @@ router.put('/export/:id', async (req, res) => {
     let boxesNum = (boxes !== undefined && boxes !== null && boxes !== '') ? Number(boxes) : null;
     let cutsNum = (cuts !== undefined && cuts !== null && cuts !== '') ? Number(cuts) : null;
 
-    if (boxesNum === null && cutsNum === null) {
+    if (boxesNum === null && cutsNum === null && (beedis === undefined || beedis === null || beedis === '')) {
       return res.status(400).json({ error: 'Number of boxes or cuts must be greater than 0' });
     }
 
-    const metrics = calculateProductionMetrics({ boxes: boxesNum, cuts: cutsNum }, settings);
+    const metrics = calculateProductionMetrics({ boxes: boxesNum, cuts: cutsNum, beedis }, settings);
     if (metrics.beedis <= 0) {
       return res.status(400).json({ error: 'Export quantity must be greater than 0' });
     }

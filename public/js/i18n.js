@@ -284,8 +284,8 @@ const translations = {
     // Export (Company Dispatch) Section
     exportTitle: 'கம்பெனி ஏற்றுமதி பதிவு (Company Export & Dispatch)',
     exportSub: 'கம்பெனிக்கு பேக்கிங் செய்து அனுப்பப்படும் கட்டை (Boxes) மற்றும் நிதி விவரங்கள்',
-    exportBoxesLabel: 'ஏற்றுமதி கட்டை எண்ணிக்கை (Boxes Exported)',
-    exportBoxesPlaceholder: 'எ.கா: 1',
+    exportBoxesLabel: 'ஏற்றுமதி பீடிகள் எண்ணிக்கை (Beedis)',
+    exportBoxesPlaceholder: 'எ.கா: 6000',
     exportDateLabel: 'ஏற்றுமதி தேதி (Export Date)',
     companyNameLabel: 'கம்பெனி / கிளை பெயர் (Company / Depot)',
     vehicleNoLabel: 'வண்டி எண் (Vehicle No)',
@@ -841,8 +841,8 @@ const translations = {
     // Export (Company Dispatch) Section
     exportTitle: 'Company Export & Dispatch',
     exportSub: 'Finished boxes packed and dispatched to company with billing and margin breakdown',
-    exportBoxesLabel: 'Exported Boxes Count (கட்டை)',
-    exportBoxesPlaceholder: 'e.g. 1',
+    exportBoxesLabel: 'Exported Beedi Count (பீடிகள்)',
+    exportBoxesPlaceholder: 'e.g. 6000',
     exportDateLabel: 'Export Date',
     companyNameLabel: 'Company / Depot Name',
     vehicleNoLabel: 'Vehicle No',

@@ -105,9 +105,6 @@
         <div class="card" id="exportFormCard">
           <div class="card-title-row">
             <h3 class="card-title"><svg class="export-inline-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m4 7 8-4 8 4-8 4-8-4Z"/><path d="m4 7v10l8 4 8-4V7M12 11v10"/></svg><span data-i18n="newExportTitle">புதிய ஏற்றுமதி பதிவு (Dispatch Entry)</span></h3>
-            <span class="export-stock-badge">
-              <svg class="export-action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m4 7 8-4 8 4-8 4-8-4Z"/><path d="m4 7v10l8 4 8-4V7M12 11v10"/></svg><span data-i18n="stockAvailableLabel">கையிருப்பு:</span> <strong id="expAvailableStockVal">0</strong> <span data-i18n="unitBoxes">Boxes</span>
-            </span>
           </div>
 
           <form id="exportForm" onsubmit="handleExportSubmit(event)">
@@ -153,13 +150,10 @@
                 <input type="date" id="exportDate" class="form-input" required onchange="handleExportDateChange(this.value)">
               </div>
               <div class="form-group">
-                <label class="form-label" for="expBoxes" data-i18n="exportBoxesLabel">ஏற்றுமதி கட்டை எண்ணிக்கை (Boxes)</label>
-                <input type="number" id="expBoxes" class="form-input" placeholder="எ.கா: 10" data-i18n-placeholder="boxesPlaceholder" min="0.1" step="0.1" required oninput="handleExportBoxesInput(this.value)">
+                <label class="form-label" for="expBeedis" data-i18n="exportBoxesLabel">ஏற்றுமதி பீடிகள் எண்ணிக்கை (Beedis)</label>
+                <input type="text" id="expBeedis" class="form-input" placeholder="எ.கா: 6000" data-i18n-placeholder="exportBoxesPlaceholder" inputmode="numeric" autocomplete="off" required oninput="handleExportBeedisInput(this)">
               </div>
             </div>
-
-            <!-- Stock Exceeded Warning -->
-            <div id="expStockExceededMsg" class="stock-exceeded-warning"></div>
 
             <!-- Live Calculation Preview Card -->
             <div class="calc-preview-card">
@@ -352,8 +346,8 @@
 
   <!-- Scripts -->
   <script src="/js/chart.umd.min.js"></script>
-  <script src="/js/i18n.js?v=20260921-2"></script>
+  <script src="/js/i18n.js?v=20261029-1"></script>
   <script src="/js/common.js?v=20260921-2"></script>
-  <script src="/js/export.js?v=20261024-2"></script>
+  <script src="/js/export.js?v=20261029-2"></script>
 </body>
 </html>

@@ -256,38 +256,43 @@ function applyCustomExportDateFilter() {
   loadExportData(from, to);
 }
 
-function getAvailableStockForExport() {
-  // There is no packed-stock calculation without a production workflow.
-  // Material availability is tracked through the Stock ledger after saving.
-  return Infinity;
-
-  const baseStock = (cachedExports && cachedExports.totals && typeof cachedExports.totals.packedStockInHand === 'number')
-    ? cachedExports.totals.packedStockInHand
-    : 0;
-
-  const currentEditId = document.getElementById('expEditId') ? document.getElementById('expEditId').value : '';
-  if (currentEditId && cachedExports && cachedExports.exports) {
-    const existing = cachedExports.exports.find(e => e._id === currentEditId);
-    if (existing) {
-      const recBoxes = existing.boxes !== undefined ? existing.boxes : ((existing.cuts || 0) / 300);
-      return Number((baseStock + recBoxes).toFixed(1));
-    }
-  }
-
-  return Number(baseStock.toFixed(1));
+function parseBeediCount(value) {
+  return Number(String(value ?? '').replace(/\D/g, '')) || 0;
 }
 
-function handleExportBoxesInput(val) {
-  const boxes = Number(val) || 0;
+function handleExportBeedisInput(inputOrValue) {
+  const input = inputOrValue && typeof inputOrValue === 'object'
+    ? inputOrValue
+    : document.getElementById('expBeedis');
+  const value = input ? input.value : inputOrValue;
+  const digitsBeforeCaret = input && typeof inputOrValue === 'object'
+    ? String(input.value.slice(0, input.selectionStart)).replace(/\D/g, '').length
+    : null;
+  const beedis = parseBeediCount(value);
+  const formattedValue = beedis ? formatNumber(beedis) : '';
+
+  if (input) {
+    input.value = formattedValue;
+    if (digitsBeforeCaret !== null) {
+      let caretPosition = 0;
+      let digitCount = 0;
+      while (caretPosition < formattedValue.length && digitCount < digitsBeforeCaret) {
+        if (/\d/.test(formattedValue[caretPosition])) digitCount++;
+        caretPosition++;
+      }
+      input.setSelectionRange(caretPosition, caretPosition);
+    }
+  }
   const beedisPerBox = window.appSettings?.beedisPerBox || 6000;
   const cutsPerBox = window.appSettings?.cutsPerBox || 300;
+  const beedisPerCut = beedisPerBox / cutsPerBox;
   const salaryPer1000 = window.appSettings?.salaryPer1000 || 320;
   const ratePer1000 = window.appSettings?.ratePer1000 || 340;
   const tobaccoPer1000 = window.appSettings?.tobaccoPer1000Grams || 600;
   const powderPer1000 = window.appSettings?.powderPer1000Grams || 200;
 
-  const cuts = Math.round(boxes * cutsPerBox);
-  const beedis = Math.round(boxes * beedisPerBox);
+  const boxes = beedisPerBox > 0 ? beedis / beedisPerBox : 0;
+  const cuts = beedisPerCut > 0 ? Math.round(beedis / beedisPerCut) : 0;
   const salary = (beedis / 1000) * salaryPer1000;
   const rate = (beedis / 1000) * ratePer1000;
   const profitWithoutCommission = rate - salary;
@@ -319,32 +324,6 @@ function handleExportBoxesInput(val) {
   const elTotalProfit = document.getElementById('prevExpTotalProfit');
   if (elTotalProfit) elTotalProfit.textContent = formatINR(totalProfit);
 
-  // Live stock limit validation
-  const available = getAvailableStockForExport();
-  const exceededEl = document.getElementById('expStockExceededMsg');
-  const submitBtn = document.getElementById('expSubmitBtn');
-  const isEn = (typeof currentLanguage !== 'undefined' && currentLanguage === 'en');
-
-  if (boxes > available) {
-    if (exceededEl) {
-      exceededEl.style.display = 'block';
-      exceededEl.textContent = isEn
-        ? `Cannot exceed packed stock in hand (${available} Boxes available)!`
-        : `ஏற்றுமதி அளவு கையிருப்பை விட அதிகமாக உள்ளது! (கையிருப்பு: ${available} கட்டை மட்டுமே உள்ளது)`;
-    }
-    if (submitBtn) {
-      submitBtn.disabled = true;
-      submitBtn.style.opacity = '0.5';
-      submitBtn.style.cursor = 'not-allowed';
-    }
-  } else {
-    if (exceededEl) exceededEl.style.display = 'none';
-    if (submitBtn) {
-      submitBtn.disabled = false;
-      submitBtn.style.opacity = '1';
-      submitBtn.style.cursor = 'pointer';
-    }
-  }
 }
 
 async function handleExportDateChange(dateVal) {
@@ -423,7 +402,7 @@ async function startEditExport(id) {
   }
 
   const editIdInput = document.getElementById('expEditId');
-  const boxesInput = document.getElementById('expBoxes');
+  const beedisInput = document.getElementById('expBeedis');
   const dateInput = document.getElementById('exportDate') || document.getElementById('expDate');
   const companyInput = document.getElementById('expCompany');
   const notesInput = document.getElementById('expNotes');
@@ -435,12 +414,10 @@ async function startEditExport(id) {
   const editModeText = document.getElementById('expEditModeText');
 
   if (editIdInput) editIdInput.value = record._id;
-  const expAvailBadgeVal = document.getElementById('expAvailableStockVal');
-  if (expAvailBadgeVal) expAvailBadgeVal.textContent = formatNumber(getAvailableStockForExport());
-
-  if (boxesInput) {
-    boxesInput.value = record.boxes;
-    handleExportBoxesInput(record.boxes);
+  const recordBeedis = record.beedis || Math.round((record.boxes || 0) * (window.appSettings?.beedisPerBox || 6000));
+  if (beedisInput) {
+    beedisInput.value = recordBeedis;
+    handleExportBeedisInput(recordBeedis);
   }
   if (dateInput) {
     const d = new Date(record.date);
@@ -458,8 +435,8 @@ async function startEditExport(id) {
     editBadge.style.display = 'flex';
     if (editModeText) {
       editModeText.textContent = isEn
-        ? `Editing Export for ${formatDate(record.date)} (${record.boxes} Boxes)`
-        : `${formatDate(record.date)} தேதிக்கான ஏற்றுமதி திருத்தம் (${record.boxes} கட்டை)`;
+        ? `Editing Export for ${formatDate(record.date)} (${formatNumber(recordBeedis)} Beedis)`
+        : `${formatDate(record.date)} தேதிக்கான ஏற்றுமதி திருத்தம் (${formatNumber(recordBeedis)} பீடிகள்)`;
     }
   }
 
@@ -475,7 +452,7 @@ async function startEditExport(id) {
 
 function cancelEditExport() {
   const editIdInput = document.getElementById('expEditId');
-  const boxesInput = document.getElementById('expBoxes');
+  const beedisInput = document.getElementById('expBeedis');
   const dateInput = document.getElementById('exportDate') || document.getElementById('expDate');
   const notesInput = document.getElementById('expNotes');
 
@@ -483,25 +460,20 @@ function cancelEditExport() {
   const submitIcon = document.getElementById('expSubmitIcon');
   const cancelBtn = document.getElementById('btnCancelEditExp');
   const editBadge = document.getElementById('expEditModeBadge');
-  const exceededEl = document.getElementById('expStockExceededMsg');
   const submitBtn = document.getElementById('expSubmitBtn');
 
   if (editIdInput) editIdInput.value = '';
-  if (boxesInput) boxesInput.value = '';
+  if (beedisInput) beedisInput.value = '';
   if (dateInput) dateInput.value = getTodayISODate();
   if (notesInput) notesInput.value = '';
 
-  const expAvailBadgeVal = document.getElementById('expAvailableStockVal');
-  if (expAvailBadgeVal) expAvailBadgeVal.textContent = formatNumber(getAvailableStockForExport());
-
-  if (exceededEl) exceededEl.style.display = 'none';
   if (submitBtn) {
     submitBtn.disabled = false;
     submitBtn.style.opacity = '1';
     submitBtn.style.cursor = 'pointer';
   }
 
-  handleExportBoxesInput(0);
+  handleExportBeedisInput(0);
 
   const isEn = (typeof currentLanguage !== 'undefined' && currentLanguage === 'en');
   if (submitText) submitText.textContent = isEn ? 'Save Export Record' : 'ஏற்றுமதியைச் சேமிக்கவும்';
@@ -518,23 +490,11 @@ async function handleExportSubmit(event) {
   const editId = document.getElementById('expEditId') ? document.getElementById('expEditId').value : '';
   const isEditing = Boolean(editId);
 
-  const boxesInput = document.getElementById('expBoxes');
-  const cutsPerBox = window.appSettings?.cutsPerBox || 300;
-  const boxes = Number(boxesInput.value) || 0;
-  const cuts = Math.round(boxes * cutsPerBox);
+  const beedisInput = document.getElementById('expBeedis');
+  const beedis = parseBeediCount(beedisInput.value);
 
-  if (boxes <= 0) {
-    showToast('Please enter valid boxes count', 'error');
-    return;
-  }
-
-  // Client-side validation against packed stock in hand
-  const available = getAvailableStockForExport();
-  if (boxes > available) {
-    const isEn = (typeof currentLanguage !== 'undefined' && currentLanguage === 'en');
-    showToast(isEn
-      ? `Export quantity (${boxes} Boxes) cannot exceed packed stock in hand (${available} Boxes)!`
-      : `ஏற்றுமதி கட்டை (${boxes}) கையிருப்பை (${available}) விட அதிகமாக இருக்கக்கூடாது!`, 'error');
+  if (!Number.isInteger(beedis) || beedis <= 0) {
+    showToast('Please enter a valid beedi count', 'error');
     return;
   }
 
@@ -550,7 +510,7 @@ async function handleExportSubmit(event) {
     const res = await fetch(url, {
       method,
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ boxes, cuts, date, companyName, notes })
+      body: JSON.stringify({ beedis, date, companyName, notes })
     });
 
     if (res.status === 409) {
@@ -651,11 +611,6 @@ function renderExportUI(data, summaryOnly = false) {
     expStockSubEl.textContent = isEn
       ? `Produced: ${formatNumber(data.totals.totalProducedBoxes || 0)} Bx | Exported: ${formatNumber(data.totals.boxes || 0)} Bx`
       : `உற்பத்தி: ${formatNumber(data.totals.totalProducedBoxes || 0)} Bx | ஏற்றுமதி: ${formatNumber(data.totals.boxes || 0)} Bx`;
-  }
-
-  const expAvailBadgeVal = document.getElementById('expAvailableStockVal');
-  if (expAvailBadgeVal) {
-    expAvailBadgeVal.textContent = formatNumber(getAvailableStockForExport());
   }
 
   if (summaryOnly) return;
@@ -1436,18 +1391,18 @@ function renderExportBarChart(granularity = currentExportChartGranularity) {
 window.addEventListener('languageChanged', () => {
   if (cachedExports) renderExportUI(cachedExports);
   updateSummarySelectionControls();
-  const boxesInput = document.getElementById('expBoxes');
-  if (boxesInput && boxesInput.value) {
-    handleExportBoxesInput(boxesInput.value);
+  const beedisInput = document.getElementById('expBeedis');
+  if (beedisInput && beedisInput.value) {
+    handleExportBeedisInput(beedisInput.value);
   }
   renderExportBarChart(currentExportChartGranularity);
 });
 
 window.addEventListener('settingsLoaded', () => {
-  const boxesInput = document.getElementById('expBoxes');
+  const beedisInput = document.getElementById('expBeedis');
   const cutsInput = document.getElementById('expCuts');
-  if (boxesInput && boxesInput.value) {
-    handleExportBoxesInput(boxesInput.value);
+  if (beedisInput && beedisInput.value) {
+    handleExportBeedisInput(beedisInput.value);
   } else if (cutsInput && cutsInput.value) {
     handleExportCutsInput(cutsInput.value);
   }
